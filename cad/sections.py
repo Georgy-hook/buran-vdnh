@@ -8,20 +8,23 @@ PORCELAIN = '#e9e7de'
 TILES = '#32383d'
 TILE_EDGE = '#475057'
 GLASS = '#263c4c'
-FRAME = '#626b70'
+FRAME = '#454b4d'
 RED = '#ba2c34'
 
 # x, half-breadth, keel, lower chine, shoulder, crown. Not factory loft data.
 NOSE = [
-    (0, .68, 12.55, 12.8, 13.45, 13.75),
-    (.43, 2.52, 10.98, 11.7, 14.45, 15.5),
-    (1.8, 5.1, 9.1, 11.4, 16.4, 19.1),
-    (5.5, 7.6, 7.0, 10.3, 17.5, 21.1),
-    (13, 10.6, 4.8, 9.1, 19.0, 24.5),
-    (23, 13.8, 2.8, 7.8, 20.9, 28.6),
-    (36, 16.9, 1.1, 6.8, 23.2, 33.3),
-    (49, 19.1, 0.15, 6.1, 25.3, 37.2),
-    (62, 19.93, 0.0, 6.35, 26.6, 39.5),
+    (0, .65, 12.57, 13.00, 13.20, 13.76),
+    (.54, 3.18, 10.58, 12.40, 13.68, 16.05),
+    (2.20, 5.73, 8.86, 11.63, 14.85, 18.35),
+    (5.50, 8.02, 7.06, 10.72, 16.29, 20.43),
+    (13, 11.41, 4.80, 9.32, 18.35, 24.17),
+    (23, 14.65, 2.80, 7.84, 20.48, 28.91),
+    (31, 16.52, 1.57, 7.13, 22.02, 32.95),
+    (39, 17.93, .68, 6.51, 23.61, 38.12),
+    (46, 18.90, .21, 6.18, 24.90, 40.23),
+    (54, 19.59, .03, 6.13, 25.96, 40.65),
+    (63, 19.93, .00, 6.37, 26.69, 40.25),
+    (68, 19.99, .00, 6.47, 26.94, 40.05),
     (72, 20.0, 0.0, 6.5, 27.0, 40.0),
 ]
 
@@ -47,14 +50,23 @@ def bezier(*points):
 def frame(station):
     x, w, base, chine, shoulder, crown = station
 
+    # Round cap and brow, broad floor only under the gear and flat bay roof aft.
+    # Use the same law for the inset core and engraving limiter as for the skin.
+    t = min(1., max(0., (x - 8.) / 58.))
+    t = t*t*(3. - 2.*t)
+    keel_flat = .07 + .30*t
+    roof_flat = .035 + .115*t
+
     def p(y, z):
         return V(x, y * w, z)
 
     def flank(s):
         return [
-            bezier(p(.37*s, base), p(.72*s, base), p(s, base+.28*(chine-base)), p(s, chine)),
+            bezier(p(keel_flat*s, base), p((.57+.15*t)*s, base),
+                   p(s, base+(.36-.08*t)*(chine-base)), p(s, chine)),
             Part.makeLine(p(s, chine), p(s, shoulder)),
-            bezier(p(s, shoulder), p(s, shoulder+.67*(crown-shoulder)), p(.56*s, crown), p(.15*s, crown)),
+            bezier(p(s, shoulder), p(s, shoulder+(.55+.12*t)*(crown-shoulder)),
+                   p((.54+.02*t)*s, crown), p(roof_flat*s, crown)),
         ]
 
     near = flank(1)
@@ -62,8 +74,8 @@ def frame(station):
     for edge in far:
         edge.reverse()
     return Part.Wire([
-        Part.makeLine(p(-.37, base), p(.37, base)), *near,
-        Part.makeLine(p(.15, crown), p(-.15, crown)), *reversed(far),
+        Part.makeLine(p(-keel_flat, base), p(keel_flat, base)), *near,
+        Part.makeLine(p(roof_flat, crown), p(-roof_flat, crown)), *reversed(far),
     ])
 
 

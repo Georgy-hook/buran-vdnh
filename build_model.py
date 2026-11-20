@@ -28,6 +28,7 @@ def build():
     import lifting
     from presentation import make_glb, save_native
     from printing import ALLOWANCE, VOLUME, assembly_check, export
+    from quicklook import export as export_quicklook
 
     print('=== FreeCAD '+'.'.join(App.Version()[:3])+' · внешние поверхности, стойки и замки', flush=True)
     lifting_parts, wing_cuts = lifting.build()
@@ -64,6 +65,12 @@ def build():
             archive.writestr('print-layout.json', json.dumps(catalog, indent=2, ensure_ascii=False))
         print('=== Цветная браузерная модель из CAD-поверхностей', flush=True)
         scene = make_glb(parts)
+        print('=== Настольная копия для Apple Quick Look в реальном масштабе', flush=True)
+        export_quicklook(scene, parts, files/'Buran.usdz')
+        catalog['quickLook'] = 'files/Buran.usdz'
+        # The HTML, poster and part notes do not need the multi-megabyte viewer payload.
+        (assets/'catalog.js').write_text('window.BURAN_CATALOG = '+json.dumps(
+            catalog, ensure_ascii=False, separators=(',',':'))+';\n', encoding='utf-8')
         catalog['glb'] = base64.b64encode(scene).decode('ascii')
         (assets/'model-data.js').write_text('window.BURAN = '+json.dumps(catalog, ensure_ascii=False, separators=(',',':'))+';\n', encoding='utf-8')
         print('=== Нативные эскизы, лофт, вырезы и презентация сборки FreeCAD', flush=True)
@@ -74,7 +81,7 @@ def build():
                     destination = site/item.relative_to(stage)
                     destination.parent.mkdir(exist_ok=True, parents=True)
                     os.replace(item, destination)
-    print('=== Готовы FCStd, цветная сцена, 14 STL и ZIP', flush=True)
+    print('=== Готовы FCStd, цветная сцена, USDZ, 14 STL и ZIP', flush=True)
 
 
 if __name__ == '__main__':

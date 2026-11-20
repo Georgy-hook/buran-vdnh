@@ -36,22 +36,28 @@ WING = (
 
 # z, передняя кромка стабилизатора, его задняя кромка/ось руля, полутолщина.
 FIN = (
-    (40.0, 169.0, 227.8, 2.90),
-    (43.5, 171.2, 226.8, 2.89),
-    (46.6, 173.6, 220.0, 2.85),
-    (49.3, 176.0, 206.0, 2.76),
-    (52.0, 178.0, 207.1, 2.73),
+    # Flared fillet at the cargo spine; the LE first rises almost vertically
+    # and rounds into the sweep. The heel below the open brake stays separate.
+    (40.0, 167.8, 227.8, 4.30),
+    (40.6, 167.9, 227.72, 3.82),
+    (42.0, 168.12, 227.40, 3.35),
+    (43.6, 168.58, 226.8, 3.08),
+    (45.4, 169.5, 224.0, 2.94),
+    (46.9, 170.65, 218.5, 2.86),
+    (49.3, 172.7, 206.0, 2.76),
+    (52.0, 175.15, 207.1, 2.73),
     (87.7, 207.7, 222.0, 1.98),
     (93.6, 213.1, 224.45, 1.71),
-    (95.7, 215.4, 225.32, 1.55),
-    (97.0, 217.9, 225.85, 1.31),
+    (95.4, 215.0, 225.23, 1.57),
+    (96.55, 216.95, 225.68, 1.41),
+    (97.0, 218.7, 225.85, 1.31),
 )
 
 # z, длина створки по X и удаление её края от плоскости симметрии.
 BRAKE = (
-    (49.6, 10.5, 5.8), (50.9, 13.8, 7.2),
-    (52.0, 14.1, 7.3), (87.7, 10.4, 5.9),
-    (93.6, 9.75, 5.65), (96.6, 9.4, 5.5),
+    (49.6, 10.5, 6.1), (50.9, 13.7, 7.9),
+    (52.0, 14.1, 8.1), (87.7, 10.4, 6.55),
+    (93.6, 9.75, 6.25), (96.6, 9.25, 6.0),
 )
 
 
@@ -103,15 +109,22 @@ def _wing_wire(y, groove=0.):
     tip = (0., nose_z)
     return _contour(lambda x, z: V(nose + x, y, z0 + z), tip, [
         ((0., .78*t), (.45*band, .88*t-groove), (band, .90*t-groove)),
-        ((band + .36*(crest-band), .94*t-groove),
-         (crest - .22*(crest-band), t-groove), (crest, t-groove)),
-        ((crest + .34*(h-crest), t-groove), (h-land-.6, zhinge+.5),
+        # Short joints describe the leading-edge blocks (4537). They fade out
+        # immediately aft of the carbon lip, not across the whole upper skin.
+        ((band + .36*(crest-band), .94*t),
+         (crest - .22*(crest-band), t), (crest, t)),
+        ((crest + .34*(h-crest), t), (h-land-.6, zhinge+.5),
          (h-land, zhinge+.40)),
         ((h-.44, zhinge+.12),), ((h-.17, zhinge-d),),
         ((h+.17, zhinge-d),), ((h+.46, zhinge+.04),),
-        ((h+.24*flap, zhinge), (c-.18*flap, zend+.68), (c, zend+.52)),
-        ((c, zend-.52),),
-        ((c-.22*flap, zend-.58), (h+.19*flap, .09*t), (h, .09*t)),
+        ((h+.24*flap, zhinge), (c-.18*flap, zend+.68), (c-.25, zend+.54)),
+        ((c-.08, zend+.52), (c, zend+.46), (c, zend+.34)),
+        ((c, zend-.34),),
+        ((c, zend-.46), (c-.08, zend-.52), (c-.25, zend-.54)),
+        ((c-.22*flap, zend-.58), (h+.19*flap, .09*t), (h+.85, .09*t)),
+        # Recess on the underside opposite the upper hinge, not a through slot.
+        ((h+.43, .09*t+.02), (h+.39, .09*t+.30), (h+.20, .09*t+.31)),
+        ((h-.18, .09*t+.31),), ((h-.47, .09*t), (h-.68, .09*t), (h-.85, .09*t)),
         ((h-.16*(h-crest), .09*t), (crest+.24*(h-crest), 0.),
          (crest+.20*(h-crest), 0.)),
         ((.76*crest, 0.),),
@@ -128,7 +141,14 @@ def _wing_skin():
     # Сквозная щель только между внутренним и внешним элевонами.
     y = 52.0
     _, aft, _, flap, _ = _interp(WING, y)
-    slit = Part.makeBox(32., .58, 20., V(aft - flap + .47, y - .29, 4.))
+    # Rounded closed end and two clipped trailing corners protect the narrow
+    # division between the inboard and outboard segments during handling.
+    start = aft - flap + .68
+    slit = Part.makeCylinder(.32, 20., V(start, y, 4.))
+    slot_plan = [(start, -.32), (aft-1.25, -.32), (aft+.8, -1.02),
+                 (aft+.8, 1.02), (aft-1.25, .32), (start, .32)]
+    slot = Part.Face(_poly([V(x, y+dy, 4.) for x, dy in slot_plan])).extrude(V(0, 0, 20.))
+    slit = slit.fuse(slot).removeSplitter()
     return skin.cut(slit)
 
 
@@ -166,7 +186,7 @@ def _key(x, width, thick, depth, embed, socket=False):
 def _fin_wire(z):
     nose, tail, r = _interp(FIN, z)
     c = tail - nose
-    band = min(2.4, .18*c)
+    band = _fin_band(z, c)
     aft = .44 * r
     tip = (0., 0.)
     return _contour(lambda x, y: V(nose+x, y, z), tip, [
@@ -178,19 +198,33 @@ def _fin_wire(z):
     ])
 
 
+def _fin_band(z, chord):
+    # Dark edge is broad at the radius of the foot, fine on the swept blade.
+    return min(.18*chord, 1.63 + 1.52*max(0., 1.-(z-40.)/8.)**2)
+
+
+def _blade_height(z, u, chord):
+    # Affine in local chord, so the end wires always cap with exact planes.
+    toe = 1.75 * (1.-u/chord) * max(0., 1.-(z-49.6)/4.)
+    fall = -.10*u * max(0., 1.-abs(z-72.8)/14.)
+    return z + toe + fall
+
+
 def _blade_wire(z, sign, recess):
     _, hinge, _ = _interp(FIN, z)
     chord, spread = _interp(BRAKE, z)
     start = hinge - 1.20
     # Рамки чёрных панелей выступают с обеих сторон каждой створки.
     # Переменная толщина только поперёк створки; рамка — часть той же оболочки.
-    xs = (0., 1.5, 1.78, chord-1.41, chord-1.13, chord)
-    radii = (.64, .82, .82-recess, .82-recess, .82, .64)
+    xs = (0., 1.5, 1.78, chord-1.41, chord-1.13, chord-.25, chord)
+    radii = (.64, .82, .82-recess, .82-recess, .82, .68, .50)
     pts = []
     for side, pairs in ((1, list(zip(xs, radii))), (-1, list(zip(xs, radii))[::-1])):
         for x, r in pairs:
             axis = .72 + x/chord * (spread-.72)
-            pts.append(V(start+x, sign*(axis + side*r), z))
+            # Chamfer the inboard corner at the foot and incline the split.
+            # These are exterior outlines of four static fields (4537, 4548).
+            pts.append(V(start+x, sign*(axis + side*r), _blade_height(z, x, chord)))
     return _poly(pts)
 
 
@@ -201,19 +235,34 @@ def _blade(sign):
                    73.48: 0., 73.76: .25, 95.22: .25, 95.50: 0., 96.6: 0.})
     body = _loft([_blade_wire(z, sign, r) for z, r in sorted(levels.items())])
     _, hinge, _ = _interp(FIN, 72.79)
-    slit = Part.makeBox(20., 30., .48, V(hinge+1.25, -15., 72.55))
-    return body.cut(slit)
+    x0 = hinge - 1.20
+    slit_plan = [(u, 72.77 - .10*u + v) for u,v in
+                 ((1.98, -.31), (21., -.31), (21., .31), (1.98, .31))]
+    slit = Part.Face(_poly([V(x0+u, -15., z) for u,z in slit_plan])).extrude(V(0, 30., 0))
+    result = body.cut(slit)
+    if not result.isValid() or len(result.Solids) != 1:
+        raise ValueError('Незамкнутая створка: проверить плоскости торцов')
+    return result
+
+
+def _blade_level(z, x):
+    _, hinge, _ = _interp(FIN, z)
+    chord, _ = _interp(BRAKE, z)
+    u = min(chord, max(0., x - (hinge-1.20)))
+    return _blade_height(z, u, chord)
 
 
 def _fin_paint(x, y, z):
     le, hinge, _ = _interp(FIN, z)
-    band = min(2.4, .18*(hinge-le))
+    band = _fin_band(z, hinge-le)
     if x <= le + band or z > 96.98:
         return CARBON
     if z >= 49.58 and x >= hinge - 1.05:
         c, _ = _interp(BRAKE, z)
         u = x - (hinge - 1.20)
-        if u < 1.78 or u > c-1.41 or z < 50.90 or z > 95.22 or 71.85 < z < 73.76:
+        if (u < 1.78 or u > c-1.41 or z > 95.22
+                or (z < 53.0 and z < _blade_level(50.90, x))
+                or (69.9 < z < 73.77 and _blade_level(71.85, x) < z < _blade_level(73.76, x))):
             return CARBON
     return IVORY
 

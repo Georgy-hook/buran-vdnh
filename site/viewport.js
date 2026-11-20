@@ -129,10 +129,20 @@
     renderer.setClearColor(0, 0);
     renderer.outputColorSpace = T.SRGBColorSpace;
     renderer.toneMapping = T.NeutralToneMapping;
-    renderer.toneMappingExposure = 1.0;
+    renderer.toneMappingExposure = 0.86;
     const light = window.BuranStudio.illuminate(T, renderer, scene);
-    const camera = new T.PerspectiveCamera(32, 1, 0.0001, 10);
-    const home = new T.Vector3(-0.90, 0.93, 1.10).normalize();
+    const camera = new T.PerspectiveCamera(23, 1, 0.0001, 10);
+    const home = new T.Vector3(-0.53, 0.92, 1.12).normalize();
+    // Catalogue crops in the assembled GLB's world frame (aft, up, port), metres.
+    // Span is the minimum width/height of the photograph at its subject plane.
+    const views = new Map([
+      ['cockpit', { at: [0.043, 0.027, 0.003], eye: [-0.86, 0.49, 1.07], span: [0.078, 0.054] }],
+      ['fin', { at: [0.202, 0.061, 0.001], eye: [0.47, 0.34, 1.16], span: [0.092, 0.084] }],
+      ['gear', { at: [0.168, -0.009, 0.023], eye: [-0.89, 0.14, 1.05], span: [0.044, 0.036] }],
+    ]);
+    const foot = Array.from(parts.values()).reduce((a, b) =>
+      a.bounds.min.y < b.bounds.min.y ? a : b,
+    );
     const orbit = new T.OrbitControls(camera, canvas);
     orbit.enablePan = false;
     orbit.enableDamping = false;
@@ -146,6 +156,7 @@
     const highlights = new Map();
     let selected = null;
     let isolated = null;
+    let detail = null;
     let amount = 0;
     let destination = 0;
     let anim = null;
@@ -156,7 +167,20 @@
 
     const currentEye = () => camera.position.clone().sub(orbit.target).normalize();
     function frame(eye, value) {
-      return window.BuranStudio.framing(T, parts, camera.aspect, camera.fov, eye, isolated, value);
+      const fit = window.BuranStudio.framing(
+        T, parts, camera.aspect, camera.fov, eye, isolated, value,
+      );
+      if (detail) {
+        fit.center.set(...detail.at);
+        const span = Math.max(detail.span[0] / camera.aspect, detail.span[1]);
+        fit.distance = span / (2 * Math.tan((camera.fov * Math.PI) / 360));
+      }
+      return fit;
+    }
+    function lightScene(fit, contact) {
+      const part = isolated ? parts.get(isolated) : foot;
+      const offset = part.delta.clone().multiplyScalar(amount);
+      light(fit.bounds, fit.radius, contact ? part : null, offset);
     }
     function placeCamera(center, eye, distance) {
       orbit.target.copy(center);
@@ -183,7 +207,7 @@
       const fit = frame(eye, destination);
       setRange(fit);
       placeCamera(fit.center, eye, fit.distance);
-      light(fit.bounds, fit.center, fit.radius, destination === 0 || !!isolated);
+      lightScene(fit, destination === 0 || !!isolated);
       dirty();
     }
     function settle() {
@@ -210,6 +234,7 @@
     orbit.addEventListener('change', dirty);
 
     function explode(value) {
+      detail = null;
       destination = value ? 1 : 0;
       if (reduced.matches || isolated) {
         snap();
@@ -219,7 +244,7 @@
       const fit = frame(eye, destination);
       const dist = camera.position.distanceTo(orbit.target);
       setRange(fit);
-      light(fit.bounds, fit.center, fit.radius, false);
+      lightScene(fit, false);
       anim = {
         eye,
         fit,
@@ -248,6 +273,7 @@
       selected = parts.has(id) ? id : null;
       const next = solo ? selected : null;
       if (next !== isolated) {
+        detail = null;
         isolated = next;
         snap();
       }
@@ -260,6 +286,23 @@
         }
       }
       dirty();
+    }
+    function renderNow() {
+      if (pending) cancelAnimationFrame(pending);
+      draw(performance.now());
+    }
+    function setView(name, opts = {}) {
+      const preset = views.get(name);
+      if (name !== 'home' && !preset) return false;
+      resize();
+      destination = 0;
+      anim = null;
+      isolated = null;
+      select(null, false);
+      detail = preset || null;
+      snap(preset ? new T.Vector3(...preset.eye).normalize() : home);
+      if (opts?.instant) renderNow();
+      return true;
     }
     function pick(event) {
       const rect = canvas.getBoundingClientRect();
@@ -336,10 +379,15 @@
       select,
       explode,
       zoom,
+      setView,
+      snapshot() {
+        resize();
+        if (lost || !width || !height) throw new Error('Снимок недоступен до отрисовки модели.');
+        renderNow();
+        return canvas.toDataURL('image/png');
+      },
       reset() {
-        destination = 0;
-        select(null, false);
-        snap(home);
+        setView('home');
       },
     };
   }

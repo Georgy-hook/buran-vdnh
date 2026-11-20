@@ -4,9 +4,10 @@ import math
 import Part
 
 from cockpit import cockpit, glazing_color
+from fairing import color as fairing_color, shoulder
 from sections import (V, NOSE, PORCELAIN, TILES, TILE_EDGE, RED, box, compound,
-                      cut, frame, fuse, inset, item, mid, poly, shell_blank, station_at)
-from skin import belt_z, hinges, markings, nose_tools, panel_tools, ring_y, side_panel
+                      cut, fuse, inset, item, mid, poly, shell_blank, station_at)
+from skin import belt_z, cap_x, hinges, markings, nose_tools, panel_tools
 
 
 class Work:
@@ -51,35 +52,37 @@ def local_tools(tools, x0, x1):
 
 def nose_color(panes):
     def paint(x, y, z):
-        if 29 < x < 60 and z > 30:
+        if 28 < x < 57 and z > 26:
             shade = glazing_color(panes, V(x, y, z))
             if shade:
                 return shade
-        if z <= belt_z(x)+.03 or x < 2.5:
-            return TILE_EDGE if x < 2.5 else TILES
+        if x < cap_x(z):
+            return TILE_EDGE
+        if z <= belt_z(x)+.03:
+            return TILES
         return PORCELAIN
     return paint
 
 
 def shell_color(x, y, z):
-    if abs(y) >= 19.94 and 163.0 < x < 187 and 17.4 < z < 25.3:
-        if abs(y) > 20.015:
-            return '#23272b'
+    if abs(y) > 20.015 and 162.5 < x < 187.5 and 16.3 < z < 25.32:
+        return '#23272b'
     if 190.0 < x < 197.4 and abs(y) > 20.01 and 18.0 < z < 25.1:
-        return RED
-    if abs(y) > 21.0 and x > 200 and z > 23:
-        for u in (216.8, 221.4, 226, 230.6):
-            if (x-u)**2+(z-29.6)**2 < 1.52**2 or (x > 233 and abs(y)>21.7 and z<31):
-                return '#343b3e'
+        return '#d1ad71' if abs(y) > 20.35 else RED
+    if x > 200 and abs(y) > 20.5:
+        accent = fairing_color(x,y,z)
+        if accent:
+            return accent
     if z < 6.51 or (x >= 219 and z < min(15.1, 6.5+math.floor((x-218)/2.1)*1.3)):
         return TILES
-    if abs(y)>19.94 and 26.1 < z < 27.05:
+    if abs(y)>20.025 and 26.1 < z < 27.05:
         return '#c7c7bd'
     return PORCELAIN
 
 
 def fore(tools):
     work = Work(NOSE)
+    window_cuts, panes = cockpit(work.shape)
     inside = [inset(station_at(x), 4.8, 3.0, 3.6) for x in (14, 22, 34, 49, 62, 72, 73)]
     # The large keyed end is open; the second, vented opening is low on the nose.
     # Core starts aft of the cap, and leaves material locally for the nose gear socket.
@@ -87,32 +90,13 @@ def fore(tools):
     core = core.cut(box(47, -5.6, -1, 14.8, 11.2, 13))
     drain = Part.makeCylinder(2.4, 18, V(15.1, 0, -3), V(0, 0, 1))
     work.apply('cut', 'Открытая полость и слив в нижней панели', [core, drain])
-    window_block, panes, _ = cockpit()
-    # Only the external canopy shell is added: do not close up the hollow interior.
-    work.apply('add', 'Гранёный фонарь · рамки и углублённые стёкла', [window_block.cut(core)])
+    work.apply('cut', 'Остекление кабины · глухие плоские выборки в обводе и тонкий переплёт', window_cuts)
     work.apply('cut', 'Ступенчатая маска, окантовки и стыки носа', nose_tools())
     work.apply('add', 'Передний разъём · две шпонки с заходными фасками', keys(72))
     work.apply('cut', 'Ложе носовой стойки', local_tools(tools, 0, 72))
     return work.finish('Nose', 'Нос и кабина экипажа', PORCELAIN, (-37,0,5), (12,52,0),
                        'Поддержки — на торце и снизу, не на стёклах. Промыть из открытого торца через слив Ø4,8 мм.',
                        paint=nose_color(panes))
-
-
-def shoulder(side):
-    outline = [(198, 26.5), (209, 24.1), (231.9, 24.1), (234.6, 25.1),
-               (234.6, 32.8), (231.8, 34.0), (210, 33.3), (199.4, 30.2)]
-    inner = poly([V(x, side*17.6, z) for x,z in outline])
-    # The outboard side of the fairing has a tapered front and a flat face aft.
-    # Build as an x-z extrusion clipped by a vertical wedge (planar end faces).
-    block = Part.Face(inner).extrude(V(0, side*7.5, 0))
-    footprint = [(197, 17), (235.5, 17), (235.5, 24.4), (212.2, 24.4), (197, 19.9)]
-    plan = Part.Face(poly([V(x, side*y, 21) for x,y in footprint])).extrude(V(0,0,16))
-    block = block.common(plan)
-    sockets = [Part.makeCylinder(1.38, 1.35, V(x, side*24.72, 29.6), V(0,-side,0))
-               for x in (216.8, 221.4, 226.0, 230.6)]
-    sockets.extend(Part.makeCylinder(.96, 1.43, V(234.95, side*21.8, z), V(-1,0,0))
-                   for z in (27.2, 30.3))
-    return cut(block, sockets)
 
 
 def trunk(tools, aft):
@@ -128,7 +112,7 @@ def trunk(tools, aft):
     work.apply('add', 'Наружные петли створок', hinges(x0,x1))
     if aft:
         work.apply('add', 'Бортовая надпись и флаг · обе стороны', markings())
-        work.apply('add', 'Кормовые накладки · глухие лунки 4 + 2', [shoulder(-1), shoulder(1)])
+        work.apply('add', 'Кормовые накладки · рельеф боковин, скоса и торца', [shoulder(-1), shoulder(1)])
     else:
         work.apply('add', 'Задний разъём · две шпонки', keys(x1))
     joint_tools = keys(x0, female=True) + local_tools(tools, x0,x1)

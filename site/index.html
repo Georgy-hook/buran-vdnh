@@ -3,19 +3,16 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#f5f3ed" />
+    <meta name="theme-color" content="#f5f6f7" />
     <meta
       name="description"
-      content="БТС-001 на ВДНХ: осмотрите цифровую реконструкцию «Бурана», разнесите сборку по деталям и скачайте модель для печати."
+      content="Реконструкция БТС-001 на ВДНХ в масштабе 1:144. Осмотрите модель и скачайте сборку FreeCAD или детали для фотополимерной печати."
     />
-    <title>Буран БТС-001 · Форма полёта</title>
+    <title>Буран БТС-001 | Форма полёта</title>
     <link rel="stylesheet" href="exhibit.css" />
     <link rel="stylesheet" href="stage.css" />
     <link rel="stylesheet" href="mobile.css" />
-    <script defer src="vendor/three-atlas.js"></script>
-    <script defer src="assets/model-data.js"></script>
-    <script defer src="studio.js"></script>
-    <script defer src="viewport.js"></script>
+    <script defer src="assets/catalog.js"></script>
     <script defer src="exhibit.js"></script>
   </head>
   <body id="top">
@@ -23,335 +20,335 @@
       <symbol id="i-download" viewBox="0 0 24 24">
         <path d="M12 3v12m-5-5 5 5 5-5M4 16v4h16v-4" />
       </symbol>
-      <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14m-6-6 6 6-6 6" /></symbol>
-      <symbol id="i-link" viewBox="0 0 24 24"><path d="M5 19 19 5M7 5h12v12" /></symbol>
-      <symbol id="i-reset" viewBox="0 0 24 24"><path d="M4 9a8 8 0 1 1-.2 6M4 3v6h6" /></symbol>
-      <symbol id="i-plus" viewBox="0 0 24 24"><path d="M4 12h16M12 4v16" /></symbol>
-      <symbol id="i-minus" viewBox="0 0 24 24"><path d="M4 12h16" /></symbol>
-      <symbol id="i-cube" viewBox="0 0 24 24">
-        <path d="m12 2 9 5v10l-9 5-9-5V7Zm0 10 9-5m-9 5L3 7m9 5v10" />
+      <symbol id="i-reset" viewBox="0 0 24 24">
+        <path d="M4 9a8 8 0 1 1-.2 6M4 3v6h6" />
       </symbol>
-      <symbol id="i-layers" viewBox="0 0 24 24">
-        <path d="m12 2 10 5-10 5L2 7Zm-9 10 9 5 9-5m-18 5 9 5 9-5" />
+      <symbol id="i-plus" viewBox="0 0 24 24">
+        <path d="M5 12h14m-7-7v14" />
       </symbol>
-      <symbol id="i-rotate" viewBox="0 0 24 24">
+      <symbol id="i-minus" viewBox="0 0 24 24"><path d="M5 12h14" /></symbol>
+      <symbol id="i-orbit" viewBox="0 0 24 24">
         <path
-          d="M12 3v3m0 12v3M18 8c3 .8 5 2 5 4 0 3-5 5-11 5S1 15 1 12c0-2 3-4 8-5m-3-3 3 3-3 3"
+          d="M6 16C2 15 1 13 2.4 10.8c2.4-3.5 10.7-6 15.8-4.6 3.6 1 4.4 3.1 2.4 5.5-2 2.3-6.3 4.4-10.5 5.1m3.6-4-4.4 4.3 5.2 1.7"
         />
       </symbol>
-      <symbol id="i-up" viewBox="0 0 24 24"><path d="M12 20V4m-7 7 7-7 7 7" /></symbol>
     </svg>
-    <a class="skip" href="#exposition">К экспонату</a>
+    <a class="skip" href="#exposition">К модели</a>
     <header class="mast">
       <div class="shell mast-inner">
-        <a class="identity" href="#top" aria-label="Форма полёта — в начало">
-          <svg class="emblem" viewBox="0 0 42 36" aria-hidden="true">
+        <a class="identity" href="#top" aria-label="Форма полёта, в начало">
+          <svg viewBox="0 0 42 36" aria-hidden="true">
             <path fill="currentColor" d="M2 31 32 4 21 28l-8 2 7-9-13 10Zm21 0 11-23 3 23Z" />
           </svg>
           <span>Форма полёта</span>
         </a>
-        <span class="mast-caption">Цифровая экспозиция</span>
-        <nav aria-label="Разделы выставки">
-          <a href="#exposition">Модель</a>
-          <a href="#passport">Об экспонате</a>
-          <a class="nav-files" href="#workshop"
-            >Файлы <svg class="icon"><use href="#i-download" /></svg
-          ></a>
+        <nav aria-label="Разделы страницы">
+          <a href="#details" class="nav-details">Детали</a>
+          <a href="#workshop">Мастерская</a>
+          <a href="#passport">Прототип</a>
         </nav>
       </div>
     </header>
     <main>
-      <section class="shell exhibit" id="exposition" aria-labelledby="title">
-        <div class="intro">
-          <div>
-            <p class="kicker">
-              <span class="signal"></span> Экспонат 01 <span class="slash">/</span> Космическая
-              техника
-            </p>
-            <h1 id="title">
-              Буран<span class="title-period">.</span> <span class="designation">БТС-001</span>
-            </h1>
-          </div>
-          <p class="standfirst">
-            Полноразмерный испытательный макет на&nbsp;ВДНХ — в&nbsp;цифровой реконструкции для
-            осмотра и&nbsp;печати.
-          </p>
-        </div>
-        <div class="instrument" id="instrument">
+      <section class="hero" id="exposition" aria-labelledby="title">
+        <div class="shell" id="instrument">
           <div class="stage" id="stage">
+            <img
+              class="poster"
+              id="poster"
+              src="assets/hero.webp"
+              width="1600"
+              height="800"
+              alt="Собранная модель БТС-001 с выпущенным шасси на подставке"
+              fetchpriority="high"
+            />
             <canvas
               id="model"
               tabindex="0"
-              aria-label="Трёхмерная модель. Стрелки вращают, плюс и минус меняют масштаб, Home возвращает начальный вид."
+              aria-label="Трёхмерная модель. Стрелки вращают, плюс и минус меняют масштаб, Home возвращает исходный вид."
               aria-describedby="gesture"
+              hidden
             ></canvas>
-            <div class="stage-id">
-              <span class="signal"></span> Фиг. 01 <span class="hud-divider">/</span>
-              <span id="scene-caption">Общий вид</span>
+            <div class="camera-tools" id="camera-tools" role="group" aria-label="Камера" hidden>
+              <button type="button" data-command="out" aria-label="Отдалить" title="Отдалить">
+                <svg class="icon"><use href="#i-minus" /></svg>
+              </button>
+              <button type="button" data-command="in" aria-label="Приблизить" title="Приблизить">
+                <svg class="icon"><use href="#i-plus" /></svg>
+              </button>
+              <button
+                type="button"
+                data-command="reset"
+                aria-label="Исходный вид"
+                title="Исходный вид"
+              >
+                <svg class="icon"><use href="#i-reset" /></svg>
+              </button>
             </div>
-            <div class="stage-scale" id="scene-scale" hidden></div>
-            <div class="ruler" aria-hidden="true"></div>
-            <div class="register-mark" aria-hidden="true"></div>
-            <div id="scene-error" class="stage-error" role="status" hidden></div>
-            <div class="stage-bottom">
-              <p class="gesture" id="gesture">
-                <svg class="icon"><use href="#i-rotate" /></svg
-                ><span class="pointer-copy">Тяните, чтобы вращать · Колесо — зум</span
-                ><span class="touch-copy">Вращайте пальцем · Два пальца — зум</span>
-              </p>
-              <div class="camera-tools" role="group" aria-label="Камера">
-                <button
-                  type="button"
-                  data-command="out"
-                  title="Отдалить"
-                  aria-label="Отдалить"
-                  disabled
-                >
-                  <svg class="icon"><use href="#i-minus" /></svg>
-                </button>
-                <button
-                  type="button"
-                  data-command="in"
-                  title="Приблизить"
-                  aria-label="Приблизить"
-                  disabled
-                >
-                  <svg class="icon"><use href="#i-plus" /></svg>
-                </button>
-                <button
-                  type="button"
-                  data-command="reset"
-                  title="Исходный вид"
-                  aria-label="Исходный вид"
-                  disabled
-                >
-                  <svg class="icon"><use href="#i-reset" /></svg>
-                </button>
+          </div>
+          <div class="hero-caption">
+            <h1 id="title">Буран</h1>
+            <p class="standfirst">Испытательный макет БТС-001 с&nbsp;ВДНХ в&nbsp;масштабе 1:144.</p>
+            <button
+              id="open-model"
+              class="primary"
+              type="button"
+              aria-controls="model model-tools"
+              aria-expanded="false"
+              hidden
+            >
+              <svg class="icon" aria-hidden="true"><use href="#i-orbit" /></svg
+              ><span>Вращать в 3D</span>
+            </button>
+          </div>
+          <p id="scene-error" class="scene-error" role="status" hidden></p>
+          <div id="model-tools" class="model-tools" hidden>
+            <div class="control-line">
+              <div class="modes" role="group" aria-label="Положение деталей">
+                <button type="button" id="assembled" aria-pressed="true">В сборе</button>
+                <button type="button" id="exploded" aria-pressed="false">Разнести</button>
+              </div>
+              <label class="part-picker" for="parts"
+                >Деталь<select id="parts">
+                  <option value="">Вся модель</option>
+                </select></label
+              >
+            </div>
+            <div id="part-card" class="part-card" hidden>
+              <div>
+                <h2 id="part-name"></h2>
+                <p id="part-note"></p>
+                <p class="part-size" id="part-size"></p>
+              </div>
+              <div class="part-actions">
+                <button id="isolate" class="secondary" type="button" aria-pressed="false">
+                  Показать отдельно</button
+                ><a class="text-link" id="part-download" download>Скачать STL</a>
               </div>
             </div>
-          </div>
-          <div class="controls">
-            <div class="modes" role="group" aria-label="Положение деталей">
-              <button type="button" id="assembled" aria-pressed="true" disabled>
-                <svg class="icon"><use href="#i-cube" /></svg>В сборе
-              </button>
-              <button type="button" id="exploded" aria-pressed="false" disabled>
-                <svg class="icon"><use href="#i-layers" /></svg>Разнести
-              </button>
-            </div>
-            <div class="part-picker">
-              <label for="parts">Деталь</label
-              ><select id="parts" disabled>
-                <option value="">Вся модель</option>
-              </select>
-            </div>
-          </div>
-          <div id="part-card" class="part-card" hidden>
-            <div>
-              <p id="part-code" class="kicker"></p>
-              <h2 id="part-name"></h2>
-              <p id="part-note"></p>
-              <p class="part-size" id="part-size"></p>
-            </div>
-            <div class="part-actions">
-              <button id="isolate" type="button" class="action" aria-pressed="false">
-                Показать отдельно</button
-              ><a class="action" id="part-download" download
-                >Скачать STL <svg class="icon"><use href="#i-download" /></svg
-              ></a>
-            </div>
+            <p class="gesture" id="gesture">
+              <span class="pointer-copy">Вращайте мышью, приближайте колёсиком.</span
+              ><span class="touch-copy">Вращайте пальцем, приближайте двумя.</span>
+              Коснитесь детали или выберите её в списке.
+            </p>
           </div>
         </div>
-        <p class="plate-caption">
-          <span
-            ><strong>Илл. 01.</strong> БТС-001, вид на авторской подставке. Выберите деталь на
-            модели или в списке.</span
-          ><a href="#workshop">К печати <span aria-hidden="true">↓</span></a>
-        </p>
-        <noscript
-          ><p>
-            Включите JavaScript для осмотра модели. Файлы и инструкция доступны ниже.
-          </p></noscript
-        >
       </section>
-      <section class="shell section-block" id="passport" aria-labelledby="passport-title">
-        <div class="section-sign">
-          <span class="section-number">01</span><span>Паспорт экспоната</span>
+      <section id="details" class="shell detail-section" aria-labelledby="detail-title">
+        <div class="detail-copy">
+          <h2 id="detail-title">Крупным планом</h2>
+          <fieldset class="detail-list">
+            <legend class="sr-only">Что рассмотреть</legend>
+            <label
+              ><input type="radio" name="detail" value="cockpit" checked /><span class="detail-name"
+                >Кабина</span
+              ><span class="detail-note"
+                >Шесть стёкол утоплены в общий обвод носа. Ниже ступенями проходит граница чёрной
+                обшивки.</span
+              ></label
+            >
+            <label
+              ><input type="radio" name="detail" value="fin" /><span class="detail-name">Киль</span
+              ><span class="detail-note"
+                >У задней кромки киля расходятся две створки руля. На каждой видны линии стыков
+                панелей.</span
+              ></label
+            >
+            <label
+              ><input type="radio" name="detail" value="gear" /><span class="detail-name"
+                >Шасси</span
+              ><span class="detail-note"
+                >Носовая и две основные опоры входят в корпус и опираются на три цоколя
+                подставки.</span
+              ></label
+            >
+          </fieldset>
         </div>
-        <div class="passport-layout">
-          <article>
-            <h2 class="headline" id="passport-title">Корабль, который<br />остался на Земле</h2>
-            <p>
-              Белая верхняя обшивка, тёмное днище и треугольные крылья знакомы по орбитальному
-              «Бурану». Но в Москве стоит другой экземпляр: БТС-001, полноразмерный макет для
-              наземных испытаний. В космос он не летал.
-            </p>
-            <p>
-              В 2014 году макет перевезли из Парка Горького на ВДНХ. Здесь за основу взят его
-              музейный облик. Основа масштаба — длина и размах орбитера: 36,4 и 24 м. Это общие
-              размеры, не обмер БТС-001. Форму уточняли по фотографиям.
-            </p>
-            <p>
-              На снимках центральный торец кормы закрыт музейным переходом. В реконструкции на этом
-              месте нейтральная заглушка, без предполагаемых сопел. Музейную лестницу не повторяли;
-              подставка спроектирована для миниатюры.
-            </p>
-          </article>
-          <aside class="measure" aria-label="Размеры цифровой модели">
-            <div class="measure-top">
-              <span class="kicker">Размерный лист</span
-              ><svg class="icon"><use href="#i-cube" /></svg>
-            </div>
-            <dl>
-              <div>
-                <dt>Масштаб</dt>
-                <dd id="scale">—</dd>
-              </div>
-              <div>
-                <dt>Длина × размах × высота<span>Без шасси и подставки</span></dt>
-                <dd id="orbiter">—</dd>
-              </div>
-              <div>
-                <dt>Габарит сборки<span>На подставке, X × Y × Z</span></dt>
-                <dd id="size">—</dd>
-              </div>
-              <div>
-                <dt>Детали сборки<span>Без двух калибров</span></dt>
-                <dd id="part-count">—</dd>
-              </div>
-            </dl>
-          </aside>
+        <div class="detail-image">
+          <img
+            class="detail-cockpit"
+            src="assets/cockpit.webp"
+            width="1000"
+            height="800"
+            loading="lazy"
+            alt="Утопленные стёкла кабины и ступенчатая граница чёрной обшивки носа"
+          />
+          <img
+            class="detail-fin"
+            src="assets/fin.webp"
+            width="1000"
+            height="800"
+            loading="lazy"
+            alt="Две раскрытые створки с панелями на задней кромке киля"
+          />
+          <img
+            class="detail-gear"
+            src="assets/gear.webp"
+            width="1000"
+            height="800"
+            loading="lazy"
+            alt="Стойка шасси с колёсами на подставке"
+          />
         </div>
       </section>
       <section class="workshop" id="workshop" aria-labelledby="workshop-title">
         <div class="shell">
-          <div class="section-sign">
-            <span class="section-number">02</span><span>Файлы и мастерская</span>
-          </div>
           <div class="workshop-head">
-            <h2 class="headline" id="workshop-title">От модели к печати</h2>
-            <p>Откройте исходник в FreeCAD или перенесите готовые детали в слайсер.</p>
+            <h2 id="workshop-title">Мастерская</h2>
+            <p>
+              Откройте сборку в FreeCAD или загрузите в слайсер 12 деталей и два посадочных калибра.
+            </p>
           </div>
           <div class="downloads">
             <a class="download" href="files/Buran-VDNH.FCStd" download
-              ><span class="file-tag">FCStd</span
-              ><span><strong>Исходник FreeCAD</strong><small>Редактируемая сборка</small></span
-              ><svg class="icon"><use href="#i-download" /></svg
+              ><span
+                ><strong>Исходник FreeCAD</strong><small>Редактируемая сборка, FCStd</small></span
+              ><svg class="icon" aria-hidden="true">
+                <use href="#i-download" /></svg
             ></a>
             <a class="download" href="files/Buran-STL.zip" download
-              ><span class="file-tag">ZIP</span
-              ><span><strong>Комплект STL</strong><small>12 деталей сборки и 2 калибра</small></span
-              ><svg class="icon"><use href="#i-download" /></svg
+              ><span><strong>Комплект STL</strong><small>Все детали и калибры, ZIP</small></span
+              ><svg class="icon" aria-hidden="true">
+                <use href="#i-download" /></svg
             ></a>
           </div>
-          <div class="guide">
-            <article>
-              <p class="step"><span>А</span> Подготовка</p>
-              <h3>Проверьте раскладку</h3>
-              <p>
-                STL ориентированы для печати и стоят на Z = 0. Импортируйте в миллиметрах, без
-                изменения масштаба. Поддержек в файлах нет — расставьте их в слайсере, по
-                возможности со скрытой стороны. У крупных секций открыты торцы, в носу есть слив
-                Ø4,8 мм. Не перекрывайте отверстия поддержками.
-              </p>
-            </article>
-            <article>
-              <p class="step"><span>Б</span> Фотополимер</p>
-              <h3>Напечатайте калибры</h3>
-              <p>
-                Для Photon Mono 4<span id="printer"></span> начните с теста при толщине слоя 0,05
-                мм. Скачайте <a href="files/stl/FitGauge.stl" download>гребёнку</a> и
-                <a href="files/stl/FitKey.stl" download>ключ</a>. Одна, две и три насечки означают
-                зазор 0,10, 0,20 и 0,30 мм на сторону соответственно. Номинал модели — 0,20 мм.
-              </p>
-            </article>
-            <article>
-              <p class="step"><span>В</span> Отделка</p>
-              <h3>Соберите насухо</h3>
-              <p>
-                После промывки, сушки и досветки проверьте ключом посадку, затем примерьте детали
-                без клея. Перед грунтом и окраской закройте стыки маской. Торцы и другие контактные
-                поверхности оставьте без краски, снимите маску и склейте сборку.
-              </p>
-            </article>
+          <div class="quick-option" id="ar-option" hidden>
+            <a
+              id="quick-look"
+              rel="ar"
+              aria-label="Посмотреть Буран в своём пространстве"
+              aria-describedby="ar-description"
+              ><img src="assets/hero.webp" alt="" width="64" height="32"
+            /></a>
+            <span id="ar-description">Посмотреть в своём пространстве</span>
           </div>
-          <div class="sequence">
-            <h3>Порядок сборки</h3>
-            <ol>
-              <li>Соедините нос, центроплан и корму.</li>
-              <li>Установите замыкающую панель и нижний щиток.</li>
-              <li>Присоедините крылья и киль, затем вставьте в корпус три опоры.</li>
-              <li>Посадите собранный корабль на три цоколя подставки.</li>
-            </ol>
+          <a id="usdz-download" class="quick-option" download hidden>Скачать USDZ</a>
+          <div class="spec-grid">
+            <div class="specs">
+              <h3>Размеры</h3>
+              <dl>
+                <div>
+                  <dt>Масштаб</dt>
+                  <dd id="scale">1:144</dd>
+                </div>
+                <div>
+                  <dt>Корпус без шасси и подставки</dt>
+                  <dd id="orbiter">252,75 × 166,6 × 97,04 мм</dd>
+                </div>
+                <div>
+                  <dt>Сборка на подставке</dt>
+                  <dd id="size">252,75 × 166,6 × 125,4 мм</dd>
+                </div>
+              </dl>
+            </div>
+            <div class="manual">
+              <h3>Печать и сборка</h3>
+              <p class="print-start">
+                Начните с калибров: слой 0,05 мм, номинальный зазор 0,20 мм на сторону.
+              </p>
+              <details>
+                <summary>Проверьте посадку на калибрах</summary>
+                <div>
+                  <p>
+                    Для Photon Mono 4 (рабочая область
+                    <span id="printer">153,4 × 87 × 165 мм</span>) напечатайте
+                    <a href="files/stl/FitGauge.stl" download>гребёнку</a> и
+                    <a href="files/stl/FitKey.stl" download>ключ</a>. Одна, две и три насечки
+                    обозначают зазоры 0,10, 0,20 и 0,30 мм на сторону соответственно.
+                  </p>
+                  <p>
+                    После промывки, сушки и досветки проверьте посадку ключом. Она зависит от смолы,
+                    экспозиции и досветки: цифровая проверка габаритов не заменяет пробную печать.
+                  </p>
+                </div>
+              </details>
+              <details>
+                <summary>Расставьте поддержки и оставьте слив</summary>
+                <div>
+                  <p>
+                    Импортируйте STL в миллиметрах без изменения масштаба. Детали ориентированы для
+                    печати и стоят на Z = 0. Поддержек в файлах нет: ставьте их на скрытых
+                    поверхностях. Оставьте открытыми торцы крупных секций и слив Ø4,8 мм в носу,
+                    чтобы промыть и досветить полости до сборки.
+                  </p>
+                </div>
+              </details>
+              <details>
+                <summary>Примерьте и соедините детали</summary>
+                <div>
+                  <p>
+                    Сначала соберите модель без клея. Перед грунтом и окраской закройте стыки
+                    маской. Контактные поверхности оставьте без краски, затем снимите маску и
+                    склейте сборку.
+                  </p>
+                  <ol>
+                    <li>Соедините нос, центроплан и корму.</li>
+                    <li>Установите замыкающую панель и нижний щиток.</li>
+                    <li>Присоедините крылья и киль, вставьте в корпус три опоры шасси.</li>
+                    <li>Установите корабль на цоколи подставки.</li>
+                  </ol>
+                </div>
+              </details>
+              <p class="safety">
+                Со смолой и промывочной жидкостью работайте в перчатках, при вентиляции, по
+                инструкции производителя.
+              </p>
+            </div>
           </div>
-          <p class="safety-note">
-            Цифровая проверка габаритов не заменяет реальную печать: посадка зависит от смолы,
-            экспозиции и досветки. Подберите режим на калибрах перед печатью всего комплекта. Со
-            смолой и промывочной жидкостью работайте в перчатках, при вентиляции, по инструкции
-            производителя.
-          </p>
         </div>
       </section>
-      <section class="shell section-block resources" aria-labelledby="sources-title">
-        <div class="section-sign">
-          <span class="section-number">03</span><span>Примечания</span>
-        </div>
-        <div class="resource-layout">
-          <div>
-            <h2 class="headline" id="sources-title">Источники</h2>
-            <p>Музейный прототип и технические ориентиры реконструкции.</p>
-          </div>
-          <ol class="references">
-            <li>
-              <a href="https://vdnh.ru/places/maket-kosmicheskogo-korablya-buran/"
-                ><span
-                  ><strong>БТС-001 на ВДНХ</strong
-                  ><small>Официальная страница экспоната</small></span
-                ><svg class="icon"><use href="#i-link" /></svg
-              ></a>
-            </li>
-            <li>
-              <a href="https://www.kpopov.ru/cosmos/buran_btc-001.htm"
-                ><span
-                  ><strong>Фотографии музейного макета</strong
-                  ><small>Фоторепортаж Константина Попова</small></span
-                ><svg class="icon"><use href="#i-link" /></svg
-              ></a>
-            </li>
-            <li>
-              <a href="https://rgantd.ru/news/pamyatnye-daty/neprevzoydennyy-buran/"
-                ><span
-                  ><strong>«Непревзойдённый „Буран“»</strong
-                  ><small>РГАНТД · размеры орбитального корабля</small></span
-                ><svg class="icon"><use href="#i-link" /></svg
-              ></a>
-            </li>
-            <li>
-              <a href="https://store.anycubic.com/products/photon-mono-4"
-                ><span
-                  ><strong>Anycubic Photon Mono 4</strong
-                  ><small>Характеристики принтера</small></span
-                ><svg class="icon"><use href="#i-link" /></svg
-              ></a>
-            </li>
-            <li>
-              <a href="https://wiki.anycubic.com/mono4/photon_mono_4-en-v0.0.2.pdf#page=7"
-                ><span
-                  ><strong>Руководство Photon Mono 4</strong
-                  ><small>Рабочая область · PDF, с. 7</small></span
-                ><svg class="icon"><use href="#i-link" /></svg
-              ></a>
-            </li>
-          </ol>
+      <section class="shell prototype" id="passport" aria-labelledby="passport-title">
+        <h2 id="passport-title">Прототип на&nbsp;ВДНХ</h2>
+        <div class="prototype-story">
+          <p class="story-lead">
+            В Москве стоит не орбитальный корабль, а полноразмерный БТС-001 для наземных испытаний.
+            В космос он не летал.
+          </p>
+          <p>
+            В 2014 году макет перевезли из Парка Горького на ВДНХ. Для миниатюры взяли его музейный
+            облик: белый верх, тёмное днище и треугольные крылья. Форму уточняли по фотографиям, а
+            масштаб вывели из длины и размаха орбитера (36,4 и 24 м), не из обмера БТС-001.
+          </p>
+          <p>
+            На снимках центр кормы закрывает музейный переход. Здесь его место занимает нейтральная
+            заглушка без предполагаемых сопел. Лестницу не воспроизводили, подставку спроектировали
+            для модели.
+          </p>
+          <details class="sources">
+            <summary id="sources-title">Источники реконструкции</summary>
+            <ul>
+              <li>
+                <a href="https://vdnh.ru/places/maket-kosmicheskogo-korablya-buran/"
+                  >БТС-001 на сайте ВДНХ</a
+                >
+              </li>
+              <li>
+                <a href="https://www.kpopov.ru/cosmos/buran_btc-001.htm"
+                  >Фотографии макета Константина Попова</a
+                >
+              </li>
+              <li>
+                <a href="https://rgantd.ru/news/pamyatnye-daty/neprevzoydennyy-buran/"
+                  >Размеры орбитера: «Непревзойдённый „Буран“», РГАНТД</a
+                >
+              </li>
+              <li>
+                <a href="https://store.anycubic.com/products/photon-mono-4"
+                  >Характеристики Photon Mono 4</a
+                >
+              </li>
+              <li>
+                <a href="https://wiki.anycubic.com/mono4/photon_mono_4-en-v0.0.2.pdf#page=7"
+                  >Руководство Photon Mono 4 (PDF, с. 7)</a
+                >
+              </li>
+            </ul>
+          </details>
         </div>
       </section>
     </main>
     <footer class="shell footer">
-      <span>Форма полёта <span class="slash">/</span> БТС-001</span
-      ><span>Независимая реконструкция · Не сайт ВДНХ</span
-      ><a href="#top"
-        >Наверх <svg class="icon"><use href="#i-up" /></svg
-      ></a>
+      <span>Независимая реконструкция. Не сайт ВДНХ.</span><a href="#top">Наверх</a>
     </footer>
     <div class="sr-only" id="notice" role="status"></div>
   </body>

@@ -2,32 +2,44 @@
 (() => {
   'use strict';
 
+  // An asymmetric photographic set, in linear radiance. The virtual softboxes
+  // exist only in reflections: nothing is ever drawn into the transparent sky.
   function lightTent(T) {
-    const w = 128;
-    const h = 64;
+    const w = 256;
+    const h = 128;
     const pixels = new Float32Array(w * h * 4);
-    const panels = [
-      { axis: [-0.6, 0.9, 0.3], power: 12, strength: 3.6 },
-      { axis: [0.5, 0.5, -1], power: 17, strength: 3 },
-      { axis: [0.8, 0.1, 0.7], power: 9, strength: 1.2 },
-    ];
-    for (const panel of panels) {
-      panel.direction = new T.Vector3(...panel.axis).normalize();
-    }
     const normal = new T.Vector3();
+    const axis = new T.Vector3(1, 0, 0);
+    function strip(direction, length, width, power) {
+      const aim = new T.Vector3(...direction).normalize();
+      const across = new T.Vector3().crossVectors(aim, axis).normalize();
+      const along = new T.Vector3().crossVectors(across, aim);
+      return { aim, across, along, length, width, power };
+    }
+    const boxes = [
+      strip([-0.18, 0.88, 0.43], 1.6, 0.26, 4.5), // silk running along the fuselage
+      strip([0.36, 0.48, -0.82], 0.96, 0.29, 3.4), // far-side rim
+      strip([-0.85, 0.12, 0.51], 0.46, 0.66, 1.9), // reflection in the windshield
+      strip([-0.28, -0.73, 0.64], 1.25, 0.74, 0.72), // bounce card below the near wing
+    ];
     for (let row = 0; row < h; row++) {
-      const lat = (row / h - 0.5) * Math.PI;
+      const lat = ((row + 0.5) / h - 0.5) * Math.PI;
       for (let col = 0; col < w; col++) {
-        const lon = (col / w - 0.5) * Math.PI * 2;
+        const lon = ((col + 0.5) / w - 0.5) * Math.PI * 2;
         normal.set(Math.cos(lat) * Math.cos(lon), Math.sin(lat), Math.cos(lat) * Math.sin(lon));
-        let light = 0.16 + 0.1 * (normal.y + 1);
-        for (const panel of panels) {
-          light += panel.strength * Math.max(0, normal.dot(panel.direction)) ** panel.power;
+        const base = 0.09 + 0.14 * Math.max(0, -normal.y); // neutral floor bounce
+        let radiance = 0;
+        for (const b of boxes) {
+          const facing = normal.dot(b.aim);
+          if (facing <= 0) continue;
+          const x = normal.dot(b.along) / (facing * b.length);
+          const y = normal.dot(b.across) / (facing * b.width);
+          radiance += b.power * Math.exp(-(x ** 4 + y ** 4));
         }
         const i = 4 * (row * w + col);
-        pixels[i] = light;
-        pixels[i + 1] = light * 0.99;
-        pixels[i + 2] = light * 0.965;
+        pixels[i] = base + radiance;
+        pixels[i + 1] = base + radiance * 0.99;
+        pixels[i + 2] = base * 1.09 + radiance * 0.98;
         pixels[i + 3] = 1;
       }
     }
@@ -38,44 +50,117 @@
     return texture;
   }
 
+  // Convex footprint of the part actually touching the floor. Only the penumbra
+  // and a short ambient shadow are painted, never the bounding rectangle.
+  function footprint(points) {
+    const sorted = points.slice().sort((a, b) => a.x - b.x || a.z - b.z);
+    function chain(vertices) {
+      const result = [];
+      for (const c of vertices) {
+        while (result.length > 1) {
+          const [a, b] = result.slice(-2);
+          if ((b.x - a.x) * (c.z - a.z) > (b.z - a.z) * (c.x - a.x)) break;
+          result.pop();
+        }
+        result.push(c);
+      }
+      return result.slice(0, -1);
+    }
+    return chain(sorted).concat(chain(sorted.reverse()));
+  }
+
+  function contactCard(T) {
+    const mask = document.createElement('canvas');
+    const ctx = mask.getContext('2d');
+    // Mesh defaults to an unlit MeshBasicMaterial even in the slim local bundle.
+    const card = new T.Mesh(new T.PlaneGeometry(1, 1));
+    const material = card.material;
+    material.transparent = true;
+    material.depthWrite = false;
+    material.toneMapped = false;
+    material.color.set(0x222832);
+    card.rotation.x = -Math.PI / 2;
+    let previous = null;
+    function place(part, offset) {
+      card.visible = !!part;
+      if (!part) return;
+      const center = part.bounds.getCenter(new T.Vector3());
+      card.position.set(
+        center.x + offset.x,
+        part.bounds.min.y + offset.y - 0.0001,
+        center.z + offset.z,
+      );
+      if (previous === part) return;
+      previous = part;
+      const size = part.bounds.getSize(new T.Vector3());
+      const padding = Math.max(size.x, size.z) * 0.2;
+      const w = size.x + 2 * padding;
+      const h = size.z + 2 * padding;
+      card.scale.set(w, h, 1);
+      const density = 512 / Math.max(w, h);
+      mask.width = Math.ceil(w * density);
+      mask.height = Math.ceil(h * density);
+      const polygon = footprint(part.points);
+      // Draw the polygon itself off-canvas: only its blurred shadow is retained.
+      ctx.beginPath();
+      for (const [i, p] of polygon.entries()) {
+        const x = (0.5 + (p.x - center.x) / w) * mask.width - 1024;
+        const y = (0.5 + (p.z - center.z) / h) * mask.height;
+        if (!i) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.closePath();
+      for (const [blur, dx, dz, alpha] of [[23, 6, 4, 0.23], [6, 1, 1, 0.34]]) {
+        ctx.shadowOffsetX = 1024 + dx;
+        ctx.shadowOffsetY = dz;
+        ctx.shadowColor = `rgba(255,255,255,${alpha})`;
+        ctx.shadowBlur = blur;
+        ctx.fill();
+      }
+      material.map?.dispose();
+      material.map = new T.CanvasTexture(mask);
+      material.needsUpdate = true;
+    }
+    return { card, place };
+  }
+
   function illuminate(T, renderer, scene) {
     scene.environment = lightTent(T);
-    scene.environmentIntensity = 0.74;
-    const dome = new T.HemisphereLight(0xfffbf4, 0xa5b4bc, 0.92);
-    const key = new T.DirectionalLight(0xfff8ed, 2.05);
-    const edge = new T.DirectionalLight(0xd0e9ff, 1.65);
-    const keyDirection = new T.Vector3(-0.9, 1.85, 0.75).normalize();
+    scene.environmentIntensity = 0.78;
+    const dome = new T.HemisphereLight(0xf8fbff, 0xd9d7d4, 0.48);
+    const key = new T.DirectionalLight(0xfffaf4, 1.85);
+    const edge = new T.DirectionalLight(0xf2f6ff, 0.74);
+    const keyDirection = new T.Vector3(-0.44, 1.1, -0.7).normalize();
+    const edgeDirection = new T.Vector3(0.9, 0.5, 0.06).normalize();
+    const contact = contactCard(T);
     key.castShadow = true;
     key.shadow.mapSize.set(1024, 1024);
-    key.shadow.bias = -0.00025;
-    const floor = new T.Mesh(
-      new T.PlaneGeometry(1, 1),
-      new T.ShadowMaterial({ color: 0x0a1718, opacity: 0.25, depthWrite: false }),
-    );
-    floor.rotation.x = -Math.PI / 2;
-    floor.receiveShadow = true;
+    key.shadow.bias = -0.00018;
+    key.shadow.radius = 3.5;
+    key.shadow.intensity = 0.72;
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = T.PCFShadowMap;
     renderer.shadowMap.autoUpdate = false;
-    scene.add(dome, key, key.target, edge, edge.target, floor);
+    scene.add(dome, key, key.target, edge, edge.target, contact.card);
 
-    return function place(box, center, radius, contact) {
-      floor.visible = contact;
-      floor.scale.setScalar(radius * 10);
-      floor.position.set(center.x, box.min.y - radius * 0.002, center.z);
+    return function place(bounds, radius, part, offset) {
+      // Keep illumination registered to the assembly, not to a camera crop.
+      const center = bounds.getCenter(new T.Vector3());
+      contact.place(part, offset);
       key.target.position.copy(center);
       edge.target.position.copy(center);
-      edge.position.copy(center).addScaledVector(new T.Vector3(0.8, 1, -1), radius * 4);
+      edge.position.copy(center).addScaledVector(edgeDirection, radius * 4);
       key.position.copy(center).addScaledVector(keyDirection, radius * 4);
-      const half = radius * 1.5;
+      const half = radius * 1.05;
       Object.assign(key.shadow.camera, {
         left: -half,
         right: half,
         top: half,
         bottom: -half,
-        near: radius * 0.1,
-        far: radius * 8,
+        near: radius * 2.8,
+        far: radius * 5.2,
       });
+      key.shadow.normalBias = radius * 0.0007;
       key.shadow.camera.updateProjectionMatrix();
       renderer.shadowMap.needsUpdate = true;
     };
@@ -122,27 +207,37 @@
     }
     const right = new T.Vector3().crossVectors(new T.Vector3(0, 1, 0), eye).normalize();
     const up = new T.Vector3().crossVectors(eye, right);
-    // Center the visible silhouette in the image plane even for an asymmetric model.
-    const image = new T.Box3();
-    for (const p of cloud) image.expandByPoint(new T.Vector3(p.dot(right), p.dot(up), p.dot(eye)));
-    const mid = image.getCenter(new T.Vector3());
+    // The projected limits depend on depth. Intersect the four sloping sides of
+    // the camera frustum with the actual support cloud; the closest fit balances
+    // opposing margins without treating empty corners of the wing box as matter.
+    const slope = Math.tan((fov * Math.PI) / 360);
+    const kx = slope * aspect * 0.91;
+    const ky = slope * 0.87;
+    const depth = bounds.getCenter(new T.Vector3()).dot(eye);
+    let left = Infinity;
+    let rightmost = -Infinity;
+    let bottom = Infinity;
+    let top = -Infinity;
+    for (const p of cloud) {
+      const z = p.dot(eye) - depth;
+      const x = p.dot(right);
+      const y = p.dot(up);
+      left = Math.min(left, x - kx * z);
+      rightmost = Math.max(rightmost, x + kx * z);
+      bottom = Math.min(bottom, y - ky * z);
+      top = Math.max(top, y + ky * z);
+    }
     const center = right
       .clone()
-      .multiplyScalar(mid.x)
-      .addScaledVector(up, mid.y)
-      .addScaledVector(eye, mid.z);
+      .multiplyScalar((left + rightmost) / 2)
+      .addScaledVector(up, (bottom + top) / 2)
+      .addScaledVector(eye, depth);
     const radius = Math.max(0.00001, bounds.getSize(new T.Vector3()).length() / 2);
-    const slopeY = Math.tan((fov * Math.PI) / 360);
-    let distance = radius * 0.42;
-    for (const p of cloud) {
-      const relative = p.sub(center);
-      const depth = relative.dot(eye);
-      distance = Math.max(
-        distance,
-        depth + Math.abs(relative.dot(right)) / (slopeY * aspect * 0.87),
-        depth + Math.abs(relative.dot(up)) / (slopeY * 0.84),
-      );
-    }
+    const distance = Math.max(
+      radius * 0.42,
+      (rightmost - left) / (2 * kx),
+      (top - bottom) / (2 * ky),
+    );
     return { center, distance, bounds, radius };
   }
 

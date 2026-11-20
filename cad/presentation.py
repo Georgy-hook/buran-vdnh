@@ -27,6 +27,22 @@ def _linear(channel):
     return channel / 12.92 if channel <= .04045 else ((channel + .055) / 1.055)**2.4
 
 
+def finish(color):
+    """Metalness/roughness of the *miniature's finish*, not flight specifications."""
+    if color in ('#263c4c', '#1d333e', '#243943'):
+        return .04, .17  # deep, reflective glazing; not a transparent hollow body
+    if color in ('#626b70', '#a4aeac', '#828c89', '#606769'):
+        return .50, .46  # metal surrounds, oleos and gear hardware
+    if color in ('#232a2b', '#343b3e', '#2c3033', '#43484c', '#292d30',
+                 '#323539', '#32383d', '#475057', '#383b3c'):
+        return .0, .88  # tyre rubber and dark external thermal surfaces
+    if color in ('#242f34', '#37474e', '#49595e'):
+        return .17, .68  # coated display plinth
+    if color in ('#f1dfba', '#bb805b'):
+        return .30, .47  # the plinth's embossed legend
+    return .0, .59  # satin-painted museum airframe, insignia and access covers
+
+
 def _segments(shape):
     # Tessellate the whole solid: trimming wires and edges are shared, including at seams.
     mesh = MeshPart.meshFromShape(Shape=shape, LinearDeflection=.045,
@@ -122,9 +138,10 @@ class _Document:
         if color not in self.palette:
             materials = self.doc['materials']
             self.palette[color] = len(materials)
+            metalness, roughness = finish(color.lower())
             materials.append(dict(name=color, pbrMetallicRoughness={
                 'baseColorFactor': [*map(_linear, srgb(color)), 1.],
-                'metallicFactor': 0., 'roughnessFactor': .42 if color.lower() == '#263c4c' else .78,
+                'metallicFactor': metalness, 'roughnessFactor': roughness,
             }))
         return self.palette[color]
 

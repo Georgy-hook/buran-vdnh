@@ -7,6 +7,7 @@ from pathlib import Path
 import FreeCAD as App
 import Part
 
+from livery import flag, name_relief
 from sections import V, NOSE, box, compound, frame, inset, mid, poly, shell_blank
 
 # Upper boundary of dark nose tiles. The steps and irregular sill are visible on BTS-001.
@@ -47,23 +48,43 @@ def ring_y(x, z, r, width=.34):
     return Part.makeCylinder(r, 56, origin, axis).cut(Part.makeCylinder(r-width, 56, origin, axis))
 
 
+def cap_x(z):
+    # On 4541 the lower lip of the cap runs farther aft than the upper lip.
+    return 2.64 - .42*(z - 13.2)
+
+
 def nose_tools():
     tools = [band(BELT, .16), ring_y(52.1, 17.5, 3.0, .35)]
     for x, z, r in [(10.8, 14.7, 1.45), (15.2, 16.3, 1.9), (20.3, 16.5, 1.95),
                     (25.4, 16.7, 1.9), (29.7, 18.5, 1.45), (29.9, 14.8, 1.25)]:
         tools.append(ring_y(x, z, r))
-    for x in (2.3, 12.5, 58.2):
+    tools.append(band([(cap_x(z), z) for z in (-2., 32.)], .17))
+    for x in (12.5, 58.2):
         tools.append(box(x, -26, -2, .31, 52, 48))
     # Limit cut depth on the changing 3-D contours, including near the round cap.
     limiter = shell_blank([inset(s, .34, .32, .32) for s in NOSE])
     return [compound(tools).cut(limiter)]
 
 
-def side_panel(x, z, w, h, side, width=.34):
-    y = 19.66 if side > 0 else -20.8
-    a = box(x, y, z, w, 1.14, h)
-    b = box(x+width, y-.1, z+width, w-2*width, 1.34, h-2*width)
-    return a.cut(b)
+def side_panel(x, z, w, h, side, width=.30):
+    # The flush inspection covers in frame 4537 have eased or fully oblong ends.
+    def contour(offset, radius):
+        x0, x1 = x+offset, x+w-offset
+        z0, z1 = z+offset, z+h-offset
+        r = radius
+        k = 2**-.5
+        def v(u, h0):
+            return V(u, side*20.45, h0)
+        a, b, c, d = v(x0+r,z0), v(x1-r,z0), v(x1,z0+r), v(x1,z1-r)
+        e, f, g, j = v(x1-r,z1), v(x0+r,z1), v(x0,z1-r), v(x0,z0+r)
+        return Part.Wire([Part.makeLine(a,b), Part.Arc(b,v(x1-r+r*k,z0+r-r*k),c).toShape(),
+                          Part.makeLine(c,d), Part.Arc(d,v(x1-r+r*k,z1-r+r*k),e).toShape(),
+                          Part.makeLine(e,f), Part.Arc(f,v(x0+r-r*k,z1-r+r*k),g).toShape(),
+                          Part.makeLine(g,j), Part.Arc(j,v(x0+r-r*k,z0+r-r*k),a).toShape()])
+    radius = min(1.35,.40*h,.40*w)
+    outer = Part.Face(contour(0,radius))
+    inner = Part.Face(contour(width,radius-width))
+    return outer.cut(inner).extrude(V(0,-side*.72,0))
 
 
 def panel_tools(x0, x1):
@@ -79,8 +100,18 @@ def panel_tools(x0, x1):
             continue
         inner = Part.Face(frame(inset(mid(x-.1), .34, .32, .35))).extrude(V(.7, 0, 0))
         tools.append(box(x, -24, 26.7, .36, 48, 15).cut(inner))
+    # Paired shallow fastener seats below the split lines of the visible side panels.
+    # Only the large fittings are represented at 1:144; no indiscriminate rivet grid.
+    for x in (82.4, 100.5, 123.2, 146.6, 161.7, 188.0, 202.8):
+        if not x0+.6 < x < x1-.6:
+            continue
+        for side in (-1, 1):
+            for offset in (0, .95):
+                centre = V(x+offset,side*20.12,24.52)
+                tools.append(Part.makeCylinder(.225, .34, centre, V(0,-side,0)))
     for x, z, w, h in [(79, 12.6, 8.6, 7.2), (104.2, 14.4, 6.0, 3.3),
-                       (127.7, 15, 10.2, 6.3), (149, 18, 4.4, 2.8), (211.8, 12, 7.2, 6.7)]:
+                       (127.7, 15, 10.2, 6.3), (149, 18, 4.4, 2.8), (174.4, 14.3, 3.8, 1.55),
+                       (183.4, 15.5, 4.8, 1.8), (199.4, 16.8, 4.1, 1.75), (211.8, 12, 7.2, 6.7)]:
         if x0 < x and x+w < x1:
             tools.extend(side_panel(x, z, w, h, s) for s in (-1, 1))
     # Selected belly tile courses: shallow staggered lines rather than separate loose tiles.
@@ -97,7 +128,10 @@ def hinges(x0, x1):
         if not x0 < x < x1-3:
             continue
         for s in (-1, 1):
-            shapes.append(Part.makeCylinder(.53, 2.5, V(x, s*19.99, 26.55), V(1, 0, 0)))
+            y = 19.80 if s>0 else -20.15
+            shapes.append(box(x-.16, y, 25.96, 2.88, .35, 1.04))
+            for dx in (0, 1.42):
+                shapes.append(Part.makeCylinder(.415, 1.1, V(x+dx,s*20.04,26.54), V(1,0,0)))
     return shapes
 
 
@@ -134,8 +168,7 @@ def lettering(text, size, x0, z0, side, width=None):
 def markings():
     shapes = []
     for s in (-1, 1):
-        shapes.extend(lettering('Буран', 6.0, 163.2, 17.5, s, 23.5))
+        shapes.extend(name_relief(s))
         shapes.extend(lettering('СССР', 1.90, 190.2, 18.22, s, 6.8))
-        y = 19.83 if s > 0 else -20.33
-        shapes.append(box(190.1, y, 21.2, 7.15, .5, 3.8))
+        shapes.append(flag(s))
     return shapes
