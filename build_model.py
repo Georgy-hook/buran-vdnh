@@ -26,14 +26,17 @@ def build():
     import display
     import hull
     import lifting
+    from baydoors import kit as bay_doors
     from presentation import make_glb, save_native
     from printing import ALLOWANCE, VOLUME, assembly_check, export
     from quicklook import export as export_quicklook
 
     print('=== FreeCAD '+'.'.join(App.Version()[:3])+' · внешние поверхности, стойки и замки', flush=True)
     lifting_parts, wing_cuts = lifting.build()
+    print('=== Крылья, киль и четыре панели готовы; шасси и стенд', flush=True)
     display_parts, gear_cuts = display.build()
-    parts = hull.build(wing_cuts+gear_cuts) + lifting_parts + display_parts
+    print('=== Корпус, отсек и ответные гнёзда по фактическим опорам', flush=True)
+    parts = hull.build(wing_cuts+gear_cuts) + bay_doors() + lifting_parts + display_parts
     print('=== Проверка объёмных пересечений, посадочных плеч и устойчивости', flush=True)
     checks = assembly_check(parts)
     print(json.dumps(checks, ensure_ascii=False), flush=True)
@@ -46,7 +49,7 @@ def build():
         assets = stage / 'assets'
         assets.mkdir()
         metadata, calibration = [], []
-        print('=== Экспорт и повторное чтение 12 STL и 2 калибров посадки', flush=True)
+        print(f'=== Экспорт и повторное чтение {len(parts)} STL и двух калибров посадки', flush=True)
         for assembly, group, output in [(True, parts, metadata), (False, gauges(), calibration)]:
             for part in group:
                 row = export(part, stl)
@@ -54,6 +57,12 @@ def build():
                 if assembly:
                     x,y,z = part['explode']
                     row.update(explode=[x*.001, z*.001, -y*.001], note=part['note'])
+                    if 'articulation' in part:
+                        motion = part['articulation']
+                        px, py, pz = motion['pivot']
+                        ax, ay, az = motion['axis']
+                        row['articulation'] = dict(family=motion['family'], angle=motion['angle'],
+                                                   pivot=[px*.001, pz*.001, -py*.001], axis=[ax, az, -ay])
                 output.append(row)
                 print(f"{row['id']}: {row['facets']} facets; {row['printSize']} mm", flush=True)
         catalog = dict(scale='1:144', printer=VOLUME.tolist(), allowance=ALLOWANCE.tolist(),
@@ -81,7 +90,7 @@ def build():
                     destination = site/item.relative_to(stage)
                     destination.parent.mkdir(exist_ok=True, parents=True)
                     os.replace(item, destination)
-    print('=== Готовы FCStd, цветная сцена, USDZ, 14 STL и ZIP', flush=True)
+    print('=== Готовы FCStd, цветная сцена, USDZ и проверенный комплект STL', flush=True)
 
 
 if __name__ == '__main__':

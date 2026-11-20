@@ -130,6 +130,10 @@
     const dome = new T.HemisphereLight(0xf8fbff, 0xd9d7d4, 0.48);
     const key = new T.DirectionalLight(0xfffaf4, 1.85);
     const edge = new T.DirectionalLight(0xf2f6ff, 0.74);
+    // A low, oblique inspection lamp makes the relief legible on dark resin.
+    // It is off in the museum pose and in the original photographic crops.
+    const lower = new T.DirectionalLight(0xf4f7ff, 2.2);
+    const lowerDirection = new T.Vector3(-0.45, -0.68, 0.73).normalize();
     const keyDirection = new T.Vector3(-0.44, 1.1, -0.7).normalize();
     const edgeDirection = new T.Vector3(0.9, 0.5, 0.06).normalize();
     const contact = contactCard(T);
@@ -141,15 +145,18 @@
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = T.PCFShadowMap;
     renderer.shadowMap.autoUpdate = false;
-    scene.add(dome, key, key.target, edge, edge.target, contact.card);
+    scene.add(dome, key, key.target, edge, edge.target, lower, lower.target, contact.card);
 
-    return function place(bounds, radius, part, offset) {
+    return function place(bounds, radius, part, offset, inspectUnderside) {
       // Keep illumination registered to the assembly, not to a camera crop.
       const center = bounds.getCenter(new T.Vector3());
       contact.place(part, offset);
       key.target.position.copy(center);
       edge.target.position.copy(center);
       edge.position.copy(center).addScaledVector(edgeDirection, radius * 4);
+      lower.visible = !!inspectUnderside;
+      lower.target.position.copy(center);
+      lower.position.copy(center).addScaledVector(lowerDirection, radius * 4);
       key.position.copy(center).addScaledVector(keyDirection, radius * 4);
       const half = radius * 1.05;
       Object.assign(key.shadow.camera, {
@@ -196,14 +203,57 @@
     return points;
   }
 
-  function framing(T, parts, aspect, fov, eye, isolated, amount) {
+  // The catalogue gives the hinge in the assembled WORLD frame. Apply the same
+  // rigid motion to the node and to the cached framing cloud; never rotate the
+  // printable mesh about its own (often distant) glTF origin.
+  function hingeFor(T, part, spec) {
+    if (!spec) return null;
+    const triple = (v) => Array.isArray(v) && v.length === 3 && v.every(Number.isFinite);
+    if (!triple(spec.axis) || !triple(spec.pivot) || !Number.isFinite(spec.angle)) {
+      throw new Error(`Не заданы параметры оси детали ${part.id}.`);
+    }
+    const axis = new T.Vector3(...spec.axis);
+    if (!axis.lengthSq()) throw new Error(`Нулевая ось детали ${part.id}.`);
+    axis.normalize();
+    const pivot = new T.Vector3(...spec.pivot);
+    const rest = part.node.quaternion.clone();
+    const turn = rest.clone();
+    const shift = new T.Vector3();
+    const matrix = part.node.matrix.clone();
+    const bounds = part.bounds.clone();
+    const cloud = part.points.map((p) => p.clone());
+    return {
+      control: spec.family === 'bay' ? 'bay' : part.id.endsWith('Upper') ? 'brakeUpper' : 'brakeLower',
+      set(travel) {
+        turn.setFromAxisAngle(axis, (Math.PI / 180) * spec.angle * travel);
+        shift.copy(pivot).sub(pivot.clone().applyQuaternion(turn));
+        matrix.makeRotationFromQuaternion(turn).setPosition(shift);
+        part.anchor.copy(part.origin).applyMatrix4(matrix);
+        part.node.quaternion.copy(turn).multiply(rest);
+        part.poseBounds = travel ? bounds.copy(part.bounds).applyMatrix4(matrix) : null;
+        part.posePoints = travel ? cloud : null;
+        if (travel) cloud.forEach((p, i) => p.copy(part.points[i]).applyMatrix4(matrix));
+      },
+    };
+  }
+
+  function framing(T, parts, aspect, fov, eye, visible, amount) {
     const cloud = [];
     const bounds = new T.Box3();
-    for (const part of parts.values()) {
-      if (isolated && isolated !== part.id) continue;
+    const shown = Array.from(parts.values()).filter(visible);
+    for (const part of shown) {
       const delta = part.delta.clone().multiplyScalar(amount);
-      bounds.union(part.bounds.clone().translate(delta));
-      for (const point of part.points) cloud.push(point.clone().add(delta));
+      bounds.union((part.poseBounds || part.bounds).clone().translate(delta));
+      for (const point of part.posePoints || part.points) cloud.push(point.clone().add(delta));
+    }
+    // The isolated base is broad, almost rectangular and only millimetres deep.
+    // Include all rim corners so its narrow rear lip never disappears off-screen.
+    if (shown.length === 1 && shown[0].id === 'Plinth') {
+      for (const x of [bounds.min.x, bounds.max.x]) {
+        for (const y of [bounds.min.y, bounds.max.y]) {
+          for (const z of [bounds.min.z, bounds.max.z]) cloud.push(new T.Vector3(x, y, z));
+        }
+      }
     }
     const right = new T.Vector3().crossVectors(new T.Vector3(0, 1, 0), eye).normalize();
     const up = new T.Vector3().crossVectors(eye, right);
@@ -241,5 +291,5 @@
     return { center, distance, bounds, radius };
   }
 
-  window.BuranStudio = Object.freeze({ illuminate, supportPoints, framing });
+  window.BuranStudio = Object.freeze({ illuminate, supportPoints, hingeFor, framing });
 })();

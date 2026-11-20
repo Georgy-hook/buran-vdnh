@@ -11,13 +11,18 @@ from livery import flag, name_relief
 from sections import V, NOSE, box, compound, frame, inset, mid, poly, shell_blank
 
 # Upper boundary of dark nose tiles. The steps and irregular sill are visible on BTS-001.
-BELT = [(-2, 24.5), (2.2, 24.5), (6.2, 24.5), (10, 24.5), (10, 22.8),
-        (13.2, 21.3), (13.2, 20.1), (16.5, 21.0), (16.5, 20.1), (20, 21.1),
-        (20, 20.0), (23.5, 21.0), (23.5, 22.3), (26.7, 21.6), (26.7, 23.2),
-        (30.1, 22.4), (30.1, 24.2), (33.4, 23.6), (33.4, 25.1), (36.8, 24.4),
-        (36.8, 26.2), (40.2, 25.6), (40.2, 27.4), (44, 26.7), (44, 28.1),
-        (46.4, 27.7), (46.4, 7.5), (48.4, 7.5), (48.4, 9.0), (50.5, 9.0),
-        (50.5, 6.9), (53.3, 6.9), (53.3, 8.4), (55.8, 8.4), (55.8, 6.5), (72.2, 6.5)]
+BELT = [(-2,22.3), (7.8,22.3), (7.8,20.0), (9.65,19.4), (9.65,18.4),
+        (11.5,17.68), (11.5,17.22), (13.0,16.92), (13.0,17.68), (14.9,17.70),
+        (14.9,18.40), (17.0,18.30), (17.0,19.0), (19.2,18.92), (19.2,19.68),
+        (21.3,19.60), (21.3,20.30), (22.45,20.2), (22.45,17.25), (24.55,17.0),
+        (24.55,17.75), (26.9,17.67), (26.9,18.43), (29.15,18.15),
+        (29.15,20.5), (31.5,20.19), (31.5,20.86), (33.7,20.80), (33.7,21.55),
+        (36.,21.52), (36.,22.28), (38.5,22.0), (38.5,25.7), (40.75,25.45),
+        (40.75,26.15), (43.05,26.12), (43.05,26.88), (45.35,26.85),
+        (45.35,27.60), (46.4,27.55), (46.4,8.25), (47.5,8.25), (47.5,9.75),
+        (48.9,9.75), (48.9,10.5), (50.2,10.5), (50.2,8.2), (51.8,8.2),
+        (51.8,9.3), (53.0,9.3), (53.0,10.45), (54.3,10.45), (54.3,7.8),
+        (55.5,7.8), (55.5,11.45), (57.0,11.45), (57.,6.5), (72.2,6.5)]
 
 
 def belt_z(x):
@@ -48,22 +53,24 @@ def ring_y(x, z, r, width=.34):
     return Part.makeCylinder(r, 56, origin, axis).cut(Part.makeCylinder(r-width, 56, origin, axis))
 
 
-def cap_x(z):
-    # On 4541 the lower lip of the cap runs farther aft than the upper lip.
-    return 2.64 - .42*(z - 13.2)
-
-
 def nose_tools():
-    tools = [band(BELT, .16), ring_y(52.1, 17.5, 3.0, .35)]
-    for x, z, r in [(10.8, 14.7, 1.45), (15.2, 16.3, 1.9), (20.3, 16.5, 1.95),
-                    (25.4, 16.7, 1.9), (29.7, 18.5, 1.45), (29.9, 14.8, 1.25)]:
-        tools.append(ring_y(x, z, r))
-    tools.append(band([(cap_x(z), z) for z in (-2., 32.)], .17))
-    for x in (12.5, 58.2):
-        tools.append(box(x, -26, -2, .31, 52, 48))
+    # Actual upper boundary has TWO sawtooth runs separated by a deep reset.
+    # 4543: flank plate bottom, service-panel outer line and small roof panel.
+    hatch = [(44.77,24.12),(46.18,24.12),(47.77,23.20),(49.25,20.64),
+             (49.25,18.70),(47.75,15.08),(45.4,15.08),(44.75,17.62)]
+    outer = Part.Face(poly([V(x,-25,z) for x,z in hatch]))
+    inner = Part.Face(poly([V(46.55+(x-46.55)*.90,-25,19.60+(z-19.60)*.947)
+                            for x,z in hatch]))
+    tools = [band(BELT, .105),
+             band([(12.25,12.),(26.95,10.01),(26.95,20.0)],.11),
+             outer.cut(inner).extrude(V(0,50,0))]
+    for y in (-5.34,5.11):
+        tools.append(box(8.23,y,19.,11.12,.23,9.9))
+    tools.append(box(19.15,-5.3,22.,.20,10.6,7.))
+    tools.extend([box(26.85,-25,10.05,.22,50,31),box(57.08,-25,5.88,.23,50,40)])
     # Limit cut depth on the changing 3-D contours, including near the round cap.
     limiter = shell_blank([inset(s, .34, .32, .32) for s in NOSE])
-    return [compound(tools).cut(limiter)]
+    return [tools[0].fuse(tools[1:]).cut(limiter).removeSplitter()]
 
 
 def side_panel(x, z, w, h, side, width=.30):
@@ -109,21 +116,49 @@ def panel_tools(x0, x1):
             for offset in (0, .95):
                 centre = V(x+offset,side*20.12,24.52)
                 tools.append(Part.makeCylinder(.225, .34, centre, V(0,-side,0)))
-    for x, z, w, h in [(79, 12.6, 8.6, 7.2), (104.2, 14.4, 6.0, 3.3),
-                       (127.7, 15, 10.2, 6.3), (149, 18, 4.4, 2.8), (174.4, 14.3, 3.8, 1.55),
-                       (183.4, 15.5, 4.8, 1.8), (199.4, 16.8, 4.1, 1.75), (211.8, 12, 7.2, 6.7)]:
+    for x, z, w, h in [(79.6, 15.0, 4.5, 4.1), (85.6, 15.0, 4.5, 4.1),
+                       (105.1, 20.5, 4.3, 1.7), (139.7, 20.5, 4.3, 1.7),
+                       (146.8, 16.5, 3.5, 1.35), (158.0, 17.8, 1.4, 2.4),
+                       (186.8, 19.1, 3.15, 1.32), (190.9, 15.9, 3.25, 1.45),
+                       (201.0, 19.1, 1.15, 1.85), (205.2, 18.4, 5.0, 2.0),
+                       (220.4, 13.0, 4.2, 6.6)]:
         if x0 < x and x+w < x1:
             tools.extend(side_panel(x, z, w, h, s) for s in (-1, 1))
-    # Selected belly tile courses: shallow staggered lines rather than separate loose tiles.
-    for i, y in enumerate((-6.4, -2.15, 2.10)):
-        tools.append(box(x0-.1, y, -.3, x1-x0+.2, .30, .55))
-        for x in range(int(x0+5+i%2*3), int(x1-1), 8):
-            tools.append(box(x, y+.3, -.3, .30, 3.95, .55))
+    if x0 >= 160:
+        # Perituss / Moscow 2026-03-31 25: two light panel scores below the
+        # shoulder strap, with close-set pairs of small fasteners between.
+        # Trace them on the fixed collar only. The separate bay roof turns.
+        for side in (-1, 1):
+            for x, end, z in ((160.2, 198.65, 26.82), (160.2, 198.65, 27.43),
+                              (160.2, 198.28, 28.89)):
+                y = 19.64 if side > 0 else -20.28
+                tools.append(box(x, y, z, end-x, .64, .17))
+            for x in (169.76, 170.19, 181.36, 181.79, 193.42, 193.85):
+                for z in (27.04, 27.32):
+                    tools.append(Part.makeCylinder(.088, .39, V(x,side*20.20,z), V(0,-side,0)))
+        # Rounded cover with a circular centre, aft of the word and flag;
+        # a second round cover is captured on both sides in 4508 and 4548.
+        for xc, zc, r in ((222.5,16.5,.92),(212.0,19.8,1.18),(199.8,22.6,.85)):
+            for side in (-1, 1):
+                axis = V(0,-side,0)
+                ctr = V(xc,side*20.30,zc)
+                outer = Part.makeCylinder(r,.51,ctr,axis)
+                tools.append(outer.cut(Part.makeCylinder(r-.17,.53,ctr,axis)))
     return tools
 
 
 def hinges(x0, x1):
     shapes = []
+    if x0 >= 160:
+        # Distinct folded tabs on the fixed aft collar. Width and spacing
+        # follow the photo relative to its 21.9 mm miniature wordmark.
+        for x in (170.98, 185.43):
+            for s in (-1, 1):
+                y = 19.37 if s > 0 else -20.12
+                shapes.append(box(x-.52, y, 28.93, 1.04, .75, .97))
+                for dx in (-.51, .10):
+                    shapes.append(Part.makeCylinder(.285, .42, V(x+dx,s*19.96,29.63), V(1,0,0)))
+        return shapes
     for x in range(79, 199, 9):
         if not x0 < x < x1-3:
             continue
@@ -136,13 +171,14 @@ def hinges(x0, x1):
 
 
 def lettering(text, size, x0, z0, side, width=None):
+    # Small upright serif «СССР» under the flag, as distinct from the sloped wordmark.
     paths = [os.environ.get('BURAN_FONT', ''),
-             '/System/Library/Fonts/Supplemental/Arial Narrow Bold Italic.ttf',
-             '/usr/share/fonts/truetype/liberation2/LiberationSans-BoldItalic.ttf',
-             'C:/Windows/Fonts/arialbi.ttf']
+             '/System/Library/Fonts/Supplemental/Times New Roman Bold.ttf',
+             '/usr/share/fonts/truetype/liberation2/LiberationSerif-Bold.ttf',
+             'C:/Windows/Fonts/timesbd.ttf']
     font = next((p for p in paths if p and Path(p).is_file()), None)
     if not font:
-        raise FileNotFoundError('Set BURAN_FONT to a Cyrillic bold italic TrueType font')
+        raise FileNotFoundError('Set BURAN_FONT to a Cyrillic bold serif TrueType font')
     glyphs = Part.makeWireString(text, font, size)
     faces = [Part.makeFace(w, 'Part::FaceMakerBullseye') for w in glyphs if w]
     bb = compound(faces).BoundBox

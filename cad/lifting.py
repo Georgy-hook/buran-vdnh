@@ -1,72 +1,62 @@
-"""БТС-001 на ВДНХ, 1:144. X — к хвосту, Y — вправо, Z — вверх (мм).
+"""VDNKh BTS-001 display, 1:144. X aft, Y starboard, Z up, model mm.
 
-Силуэт, разрез руля и окраска: kpopov.ru/cosmos/buran_btc-001.htm,
-кадры 4508, 4537 и 4548; членение элевонов также видно на макете, 4517.
-Номинальные углы наплыва/консоли (78°/45°): buran.ru/htm/aerodina.htm.
-Профили и малые зазоры адаптированы для настольной печати, не лётные.
+Ground views: kpopov.ru/cosmos/buran_btc-001.htm, 4508/4537/4548;
+side outline: Commons File:Buran_at_VDNKh.jpg. The upper brow and lower
+heel stay fixed. Four removable rudder/brake leaves rotate about two swept
+axes. Pins and bearings are scale-print adaptations, not museum mechanisms.
 """
-
 from bisect import bisect_right
+from math import cos, radians, sqrt
 
 import Part
 from FreeCAD import Vector as V
+from sections import PORCELAIN
+from wing_relief import CARBON, paint as wing_paint, wing_skin
+
+# The portion of the swept hinge line visible in the nearly lateral photograph
+# runs from about (755,284) to (832,175) px. The fin stands 164 px above the
+# spine in that image. Z=40..97 is the corresponding kit dimension.
+SLOPE = .70
+S = sqrt(1.+SLOPE**2)
+AXIS = V(SLOPE/S, 0, 1./S)
+CHORD = V(1./S, 0, -SLOPE/S)
+OPEN = 32.0
+AXLE_Y = 1.62
+PIN = .78
+BORE = .98
+HUB = 1.44
+SEAT = 2.75
 
 
-IVORY = '#e4e1d6'
-CARBON = '#292d30'
-JOINT = '#383b3c'
-BELLY = '#323539'
+def pivot(sign):
+    return V(194.2, sign*AXLE_Y, 54.)
 
-# y, носок, задняя кромка, высота профиля, хорда элевона, ширина носовой панели.
-# Скруглённый переход между наплывом и основной консолью — не острый излом.
-WING = (
-    (20.0, 82.0, 224.0, 10.7, 21.6, 6.4),
-    (27.5, 117.3, 222.7, 9.4, 20.8, 6.3),
-    (30.5, 128.8, 222.2, 8.8, 20.4, 6.1),
-    (33.5, 136.6, 221.7, 8.2, 20.0, 5.9),
-    (37.0, 142.1, 221.1, 7.7, 19.4, 5.7),
-    (40.0, 145.4, 220.6, 7.3, 19.0, 5.5),
-    (64.0, 169.4, 216.5, 4.9, 15.0, 4.4),
-    (78.0, 183.4, 213.9, 3.5, 12.2, 3.8),
-    (80.3, 185.8, 213.4, 3.2, 11.6, 3.5),
-    (82.0, 187.9, 212.8, 2.8, 11.2, 3.1),
-    (83.0, 189.9, 212.0, 2.3, 10.4, 2.6),
-    (83.3, 191.4, 211.5, 1.9, 9.4, 2.3),
-)
 
-# z, передняя кромка стабилизатора, его задняя кромка/ось руля, полутолщина.
+def _hinge_x(z):
+    return 194.2+SLOPE*(z-54.)
+
+
+# z, LE, aft edge of fixed fin, half thickness. Broad lower root carries
+# the same two assembly keys as before. The cap overhangs the movable leaves.
 FIN = (
-    # Flared fillet at the cargo spine; the LE first rises almost vertically
-    # and rounds into the sweep. The heel below the open brake stays separate.
-    (40.0, 167.8, 227.8, 4.30),
-    (40.6, 167.9, 227.72, 3.82),
-    (42.0, 168.12, 227.40, 3.35),
-    (43.6, 168.58, 226.8, 3.08),
-    (45.4, 169.5, 224.0, 2.94),
-    (46.9, 170.65, 218.5, 2.86),
-    (49.3, 172.7, 206.0, 2.76),
-    (52.0, 175.15, 207.1, 2.73),
-    (87.7, 207.7, 222.0, 1.98),
-    (93.6, 213.1, 224.45, 1.71),
-    (95.4, 215.0, 225.23, 1.57),
-    (96.55, 216.95, 225.68, 1.41),
-    (97.0, 218.7, 225.85, 1.31),
-)
-
-# z, длина створки по X и удаление её края от плоскости симметрии.
-BRAKE = (
-    (49.6, 10.5, 6.1), (50.9, 13.7, 7.9),
-    (52.0, 14.1, 8.1), (87.7, 10.4, 6.55),
-    (93.6, 9.75, 6.25), (96.6, 9.25, 6.0),
+    (40.0, 167.8, 223.0, 4.30), (40.65, 167.87, 221.9, 3.91),
+    (42.2, 167.99, 216.6, 3.45), (44.0, 168.18, 208.55, 3.22),
+    (45.0, 168.37, 208.92, 3.12), (47.0, 168.69, 210.0, 2.99),
+    (47.85, 168.92, 208.85, 2.95), (49.0, 169.30, 201.4, 2.88),
+    (51.2, 170.54, _hinge_x(51.2)+1.73*S, 2.78),
+    (53.8, 172.70, _hinge_x(53.8)+1.73*S, 2.71),
+    (87.7, 203.43, _hinge_x(87.7)+1.73*S, 1.99),
+    (92.25, 207.55, _hinge_x(92.25)+1.73*S, 1.84),
+    (93.18, 208.47, 231.72, 1.72), (96.1, 212.05, 231.86, 1.55),
+    (96.75, 213.91, 231.86, 1.42), (97.0, 216.0, 231.85, 1.35),
 )
 
 
 def _interp(table, v):
-    """Линейная интерполяция ряда размеров между соседними сечениями."""
-    i = max(1, min(len(table) - 1, bisect_right(table, (v, float('inf')))))
-    a, b = table[i - 1:i + 1]
-    k = min(1., max(0., (v - a[0]) / (b[0] - a[0])))
-    return tuple(x + k * (y - x) for x, y in zip(a[1:], b[1:]))
+    i = max(1, min(len(table)-1, bisect_right(table, (v, float('inf')))))
+    a, b = table[i-1:i+1]
+    k = min(1., max(0., (v-a[0])/(b[0]-a[0])))
+    return tuple(x+k*(y-x) for x, y in zip(a[1:], b[1:]))
 
 
 def _curve(points):
@@ -86,7 +76,6 @@ def _contour(embed, start, segments):
 
 
 def _loft(wires):
-    # Линейно вдоль размаха, без выпучивания или перехлёста за малые хорды.
     return Part.makeLoft(wires, True, True)
 
 
@@ -94,79 +83,7 @@ def _poly(points):
     return Part.makePolygon([*points, points[0]])
 
 
-def _wing_wire(y, groove=0.):
-    nose, tail, t, flap, band = _interp(WING, y)
-    h = tail - flap - nose  # Местная координата шарнира, от носка.
-    c = tail - nose
-    crest = max(band + .2, .40 * h)
-    # Широкий, незаметный в сборке плоский участок снизу служит опорой печати.
-    z0 = 8.0
-    zend = .18 * t + .68
-    zhinge = .37 * t + .42
-    nose_z = .46 * t
-    land = min(1.25, max(.60, .13 * (h - band)))
-    d = min(.42, .10 * t)
-    tip = (0., nose_z)
-    return _contour(lambda x, z: V(nose + x, y, z0 + z), tip, [
-        ((0., .78*t), (.45*band, .88*t-groove), (band, .90*t-groove)),
-        # Short joints describe the leading-edge blocks (4537). They fade out
-        # immediately aft of the carbon lip, not across the whole upper skin.
-        ((band + .36*(crest-band), .94*t),
-         (crest - .22*(crest-band), t), (crest, t)),
-        ((crest + .34*(h-crest), t), (h-land-.6, zhinge+.5),
-         (h-land, zhinge+.40)),
-        ((h-.44, zhinge+.12),), ((h-.17, zhinge-d),),
-        ((h+.17, zhinge-d),), ((h+.46, zhinge+.04),),
-        ((h+.24*flap, zhinge), (c-.18*flap, zend+.68), (c-.25, zend+.54)),
-        ((c-.08, zend+.52), (c, zend+.46), (c, zend+.34)),
-        ((c, zend-.34),),
-        ((c, zend-.46), (c-.08, zend-.52), (c-.25, zend-.54)),
-        ((c-.22*flap, zend-.58), (h+.19*flap, .09*t), (h+.85, .09*t)),
-        # Recess on the underside opposite the upper hinge, not a through slot.
-        ((h+.43, .09*t+.02), (h+.39, .09*t+.30), (h+.20, .09*t+.31)),
-        ((h-.18, .09*t+.31),), ((h-.47, .09*t), (h-.68, .09*t), (h-.85, .09*t)),
-        ((h-.16*(h-crest), .09*t), (crest+.24*(h-crest), 0.),
-         (crest+.20*(h-crest), 0.)),
-        ((.76*crest, 0.),),
-        ((.47*crest, 0.), (0., .14*t), tip),
-    ])
-
-
-def _wing_skin():
-    # На верхней поверхности — неглубокие стыки крупных панелей/блоков носка.
-    stations = {row[0]: 0. for row in WING}
-    for y in (26.0, 34.8, 43.7, 53.8, 64.7, 73.6, 79.3):
-        stations.update({y-.24: 0., y-.075: .20, y+.075: .20, y+.24: 0.})
-    skin = _loft([_wing_wire(y, g) for y, g in sorted(stations.items())])
-    # Сквозная щель только между внутренним и внешним элевонами.
-    y = 52.0
-    _, aft, _, flap, _ = _interp(WING, y)
-    # Rounded closed end and two clipped trailing corners protect the narrow
-    # division between the inboard and outboard segments during handling.
-    start = aft - flap + .68
-    slit = Part.makeCylinder(.32, 20., V(start, y, 4.))
-    slot_plan = [(start, -.32), (aft-1.25, -.32), (aft+.8, -1.02),
-                 (aft+.8, 1.02), (aft-1.25, .32), (start, .32)]
-    slot = Part.Face(_poly([V(x, y+dy, 4.) for x, dy in slot_plan])).extrude(V(0, 0, 20.))
-    slit = slit.fuse(slot).removeSplitter()
-    return skin.cut(slit)
-
-
-def _wing_paint(x, y, z):
-    le, te, t, flap, band = _interp(WING, abs(y))
-    q = (x - le) / (te - le)
-    if z < 8. + (1.-q) * .46*t + q * (.18*t + .68):
-        return BELLY
-    if x < le + band:
-        return CARBON
-    h = te - flap
-    if h - min(1.25, max(.60, .13*(h-le-band))) <= x <= h + .46:
-        return JOINT
-    return IVORY
-
-
 def _key_wire(center, depth, wide, thick, embed):
-    """Восьмиугольное сечение: снятые углы не упираются в скругления гнезда."""
     a, b = wide/2, thick/2
     f = min(.7, .43*b)
     profile = ((-a+f, -b), (a-f, -b), (a, -b+f), (a, b-f),
@@ -175,7 +92,6 @@ def _key_wire(center, depth, wide, thick, embed):
 
 
 def _key(x, width, thick, depth, embed, socket=False):
-    # +0.20 на сторону, +0.45 по глубине. Фаска на входном конце шипа.
     if socket:
         return _loft([_key_wire(x, d, width+.4, thick+.4, embed)
                       for d in (-.6, depth+.45)])
@@ -183,88 +99,124 @@ def _key(x, width, thick, depth, embed, socket=False):
                   for d, r in ((-.52, 0.), (depth-.70, 0.), (depth, .39))])
 
 
+def _fin_band(z, chord):
+    return min(.18*chord, 1.38+1.30*max(0., 1.-(z-40.)/9.)**2)
+
+
 def _fin_wire(z):
     nose, tail, r = _interp(FIN, z)
-    c = tail - nose
+    c = tail-nose
     band = _fin_band(z, c)
-    aft = .44 * r
+    # Thin centre web behind the pivot prevents an open slot along the entire
+    # hinge, while leaving clearance between the four independent leaves.
+    aft = (.20 if 51.2 <= z <= 92.25 else .54)*r
     tip = (0., 0.)
     return _contour(lambda x, y: V(nose+x, y, z), tip, [
         ((0., .55*r), (.48*band, .76*r), (band, .81*r)),
-        ((.36*c, 1.12*r), (.54*c, r), (c-1.0, aft+.08)),
-        ((c, aft),), ((c, -aft),), ((c-1.0, -aft-.08),),
+        ((.36*c, 1.12*r), (.54*c, r), (c-.78, aft+.08)),
+        ((c, aft),), ((c, -aft),), ((c-.78, -aft-.08),),
         ((.54*c, -r), (.36*c, -1.12*r), (band, -.81*r)),
         ((.48*band, -.76*r), (0., -.55*r), tip),
     ])
 
 
-def _fin_band(z, chord):
-    # Dark edge is broad at the radius of the foot, fine on the swept blade.
-    return min(.18*chord, 1.63 + 1.52*max(0., 1.-(z-40.)/8.)**2)
-
-
-def _blade_height(z, u, chord):
-    # Affine in local chord, so the end wires always cap with exact planes.
-    toe = 1.75 * (1.-u/chord) * max(0., 1.-(z-49.6)/4.)
-    fall = -.10*u * max(0., 1.-abs(z-72.8)/14.)
-    return z + toe + fall
-
-
-def _blade_wire(z, sign, recess):
-    _, hinge, _ = _interp(FIN, z)
-    chord, spread = _interp(BRAKE, z)
-    start = hinge - 1.20
-    # Рамки чёрных панелей выступают с обеих сторон каждой створки.
-    # Переменная толщина только поперёк створки; рамка — часть той же оболочки.
-    xs = (0., 1.5, 1.78, chord-1.41, chord-1.13, chord-.25, chord)
-    radii = (.64, .82, .82-recess, .82-recess, .82, .68, .50)
-    pts = []
-    for side, pairs in ((1, list(zip(xs, radii))), (-1, list(zip(xs, radii))[::-1])):
-        for x, r in pairs:
-            axis = .72 + x/chord * (spread-.72)
-            # Chamfer the inboard corner at the foot and incline the split.
-            # These are exterior outlines of four static fields (4537, 4548).
-            pts.append(V(start+x, sign*(axis + side*r), _blade_height(z, x, chord)))
-    return _poly(pts)
-
-
-def _blade(sign):
-    # Отдельные светлые поля верхней и нижней половин; поперечная чёрная рамка.
-    levels = {row[0]: .25 for row in BRAKE}
-    levels.update({49.6: 0., 50.65: 0., 50.9: .25, 71.85: .25, 72.14: 0.,
-                   73.48: 0., 73.76: .25, 95.22: .25, 95.50: 0., 96.6: 0.})
-    body = _loft([_blade_wire(z, sign, r) for z, r in sorted(levels.items())])
-    _, hinge, _ = _interp(FIN, 72.79)
-    x0 = hinge - 1.20
-    slit_plan = [(u, 72.77 - .10*u + v) for u,v in
-                 ((1.98, -.31), (21., -.31), (21., .31), (1.98, .31))]
-    slit = Part.Face(_poly([V(x0+u, -15., z) for u,z in slit_plan])).extrude(V(0, 30., 0))
-    result = body.cut(slit)
-    if not result.isValid() or len(result.Solids) != 1:
-        raise ValueError('Незамкнутая створка: проверить плоскости торцов')
-    return result
-
-
-def _blade_level(z, x):
-    _, hinge, _ = _interp(FIN, z)
-    chord, _ = _interp(BRAKE, z)
-    u = min(chord, max(0., x - (hinge-1.20)))
-    return _blade_height(z, u, chord)
-
-
 def _fin_paint(x, y, z):
-    le, hinge, _ = _interp(FIN, z)
-    band = _fin_band(z, hinge-le)
-    if x <= le + band or z > 96.98:
+    le, tail, _ = _interp(FIN, z)
+    if x < le+_fin_band(z, tail-le) or z > 96.75:
         return CARBON
-    if z >= 49.58 and x >= hinge - 1.05:
-        c, _ = _interp(BRAKE, z)
-        u = x - (hinge - 1.20)
-        if (u < 1.78 or u > c-1.41 or z > 95.22
-                or (z < 53.0 and z < _blade_level(50.90, x))
-                or (69.9 < z < 73.77 and _blade_level(71.85, x) < z < _blade_level(73.76, x))):
+    if z >= 93.18 and x >= tail-.80 or 44. < z < 49.6 and x > tail-1.1:
+        return CARBON
+    if 51.2 < z < 92.3 and x >= _hinge_x(z)-2.65:
+        return CARBON
+    return PORCELAIN
+
+
+def _local(sign, u, y, w):
+    return pivot(sign)+CHORD*u+V(0, y, 0)+AXIS*w
+
+
+def _block(sign, u0, u1, y0, y1, w0, w1):
+    face = Part.Face(_poly([_local(sign, u, y, w0) for u, y in
+                            ((u0, y0), (u1, y0), (u1, y1), (u0, y1))]))
+    return face.extrude(AXIS*(w1-w0))
+
+
+# front z, rear z, aft u in the open display. The transverse split slopes
+# distinctly towards the tail in side view. Above the split is the longer leaf.
+LEVELS = (((54.0, 54.3, 14.15), (72.3, 68.8, 10.75)),
+          ((73.15, 69.65, 10.65), (91.65, 91.8, 8.75)))
+FRONT = 1.68
+
+
+def _leaf_local(end, fraction):
+    front_z, rear_z, rear_u = end
+    open_u0 = FRONT*cos(radians(OPEN))
+    u = FRONT+(rear_u-open_u0)*fraction/cos(radians(OPEN))
+    w = (front_z+(rear_z-front_z)*fraction-54.)*S+SLOPE*u*cos(radians(OPEN))
+    return u, w
+
+
+def _layer(sign, segment, level, recess):
+    low, high = LEVELS[segment]
+    end = tuple(a+(b-a)*level for a,b in zip(low, high))
+    fractions = (0., .085, .11, .877, .907, 1.)
+    widths = (.71, .79, .79-recess, .79-recess, .79, .48)
+    outline = []
+    for side, indices in ((1, range(6)), (-1, reversed(range(6)))):
+        for i in indices:
+            u, w = _leaf_local(end, fractions[i])
+            outline.append(_local(sign, u, side*widths[i], w))
+    return _poly(outline)
+
+
+def _seat_w(segment):
+    return _leaf_local(LEVELS[segment][0], 0.)[1]+6.6
+
+
+def _leaf(sign, segment):
+    seat = _seat_w(segment)
+    body = _loft([_layer(sign, segment, z, relief) for z, relief in
+                  ((0., 0.), (.045, 0.), (.063, .20), (.937, .20), (.955, 0.), (1., 0.))])
+    neck = _block(sign, -.06, FRONT+.35, -.67, .67, seat, seat+2.10)
+    collar = Part.makeCylinder(HUB, 2.10, _local(sign, 0, 0, seat), AXIS)
+    shaft = Part.makeCylinder(PIN, SEAT+.1, _local(sign, 0, 0, seat-SEAT), AXIS)
+    chamfer = Part.makeCone(.57, PIN, .35, _local(sign, 0, 0, seat-SEAT-.35), AXIS)
+    leaf = body.multiFuse([neck, collar, shaft, chamfer]).removeSplitter()
+    leaf.rotate(pivot(sign), AXIS, sign*OPEN)
+    return leaf
+
+
+def _bearing(sign, segment):
+    w = _seat_w(segment)
+    seat = Part.makeCylinder(1.48, SEAT+.56, _local(sign, 0, 0, w-SEAT-.56), AXIS)
+    # The forward web reaches into the central airfoil; the ring is pierced
+    # all the way through so liquid resin and trapped air can escape.
+    neck = _block(sign, -4.0, .03, -1.03, 1.03, w-SEAT-.56, w)
+    hole = Part.makeCylinder(BORE, SEAT+1., _local(sign, 0, 0, w-SEAT-.8), AXIS)
+    return seat.fuse(neck).cut(hole).removeSplitter()
+
+
+def _leaf_paint(sign, segment):
+    from FreeCAD import Rotation
+    undo = Rotation(AXIS, -sign*OPEN)
+    low, high = LEVELS[segment]
+    def paint(x, y, z):
+        p = undo.multVec(V(x, y, z)-pivot(sign))
+        u, w = p.dot(CHORD), p.dot(AXIS)
+        if u < FRONT+.6:
             return CARBON
-    return IVORY
+        def row(end):
+            ua, wa = _leaf_local(end, 0.)
+            ub, wb = _leaf_local(end, 1.)
+            return wa+(wb-wa)*(u-ua)/(ub-ua)
+        wl, wh = row(low), row(high)
+        level = (w-wl)/(wh-wl)
+        rear = _leaf_local(tuple(a+(b-a)*level for a,b in zip(low, high)), 1.)[0]
+        fraction = (u-FRONT)/(rear-FRONT)
+        if level < .061 or level > .94 or fraction < .11 or fraction > .88:
+            return CARBON
+        return PORCELAIN
+    return paint
 
 
 def _mirror(shape):
@@ -272,44 +224,61 @@ def _mirror(shape):
 
 
 def _part(name, label, shape, explode, orientation, paint, note):
-    solid, = shape.Solids  # OCC может вернуть Compound-обёртку после объединения.
+    solid, = shape.Solids
     return dict(id=name, label=label, group='Оперение', shape=solid,
-                color=IVORY, explode=explode, orientation=orientation,
+                color=PORCELAIN, explode=explode, orientation=orientation,
                 note=note, paint=paint)
 
 
+def tail():
+    def along_z(x, y, d):
+        return V(x, y, 40.-d)
+    keys = [(184., 12.6, 3.35, 4.4), (215., 9.4, 2.35, 4.4)]
+    fixed = _loft([_fin_wire(row[0]) for row in FIN])
+    # Counterbores include a 3.6 mm extraction stroke. Remove the open upper
+    # leaf first, then the lower; reverse that order to assemble. In between
+    # the bearings, the continuous dark fairing closes the hinge line.
+    clearances = [Part.makeCylinder(HUB+.31, SEAT+6.92,
+                                    _local(sign, 0, 0, _seat_w(i)-SEAT-.76), AXIS)
+                  for sign in (-1, 1) for i in (0, 1)]
+    fixed = fixed.cut(clearances[0].multiFuse(clearances[1:]))
+    bearings = [_bearing(sign, i) for sign in (-1, 1) for i in (0, 1)]
+    fin = fixed.multiFuse([*bearings, *[_key(*k, along_z) for k in keys]]).removeSplitter()
+    sockets = [_key(*k, along_z, socket=True) for k in keys]
+    parts = [_part('Fin', 'Неподвижный киль с четырьмя гнёздами', fin, (0, 0, 25),
+                   (10, -16, 0), _fin_paint, 'Проверьте сквозные Ø1,96 мм лунки; не заливать смолой. '
+                   'Не ставьте опоры на рабочие грани шипов киля.')]
+    for sign, hand, name in ((-1, 'Port', 'левая'), (1, 'Starboard', 'правая')):
+        for i, height, word in ((0, 'Lower', 'нижняя'), (1, 'Upper', 'верхняя')):
+            p = _part('Brake'+hand+height, f'Створка руля · {name} {word}', _leaf(sign, i),
+                      (9, 10*sign, 26+10*i), (15*sign, -24, 0), _leaf_paint(sign, i),
+                      'Вставить штифт Ø1,56 мм вдоль оси в гнездо сверху. Для снятия в '
+                      'открытом положении приподнять на 3,6 мм вдоль оси и отвести наружу. '
+                      'Снять верхнюю первой. Не склеивать шарнир.')
+            # All delivered BReps are in the open, assembled coordinates.
+            p['articulation'] = dict(pivot=list(pivot(sign)), axis=list(AXIS), angle=-sign*OPEN, family='brake')
+            parts.append(p)
+    return parts, sockets
+
+
 def build():
-    """Три печатные детали и шесть инструментов для пазов в фюзеляже."""
-    skin = _wing_skin()
-    cutters = []
-    parts = []
+    skin = wing_skin()
+    parts, cutters = [], []
     for sign, name, label in ((-1, 'WingPort', 'Левая консоль крыла'),
                               (1, 'WingStarboard', 'Правая консоль крыла')):
         def along_y(x, z, d):
-            return V(x, 20.-d, (13.1 if x < 150. else 12.0) + z)
-
-        # Различаются длины сечений и интервалы: перепутать консоли нельзя.
-        keys = [(114.+sign, 14.8, 4.3, 5.5), (193.-2*sign, 10.6, 3.2, 4.8)]
+            return V(x, 20.-d, (7.55 if x < 150. else 5.60)+z)
+        # Shorter rear tab fits within the lowered root section, behind the
+        # bogie mount; the old, taller tab would poke through the elevon.
+        keys = [(114.+sign, 14.8, 4.0, 5.5), (185.+sign, 9.6, 2.15, 4.8)]
         solid = skin.multiFuse([_key(*k, along_y) for k in keys]).removeSplitter()
         sockets = [_key(*k, along_y, socket=True) for k in keys]
         if sign < 0:
             solid = _mirror(solid)
             sockets = [_mirror(s) for s in sockets]
         cutters.extend(sockets)
-        parts.append(_part(name, label, solid, (0, 28*sign, 0), (32*sign, -14, 0), _wing_paint,
-                           'Консоль уже наклонена от платформы, корень ниже законцовки. '
-                           'Поддержки по внутренней и нижней стороне, не на линии элевонов '
-                           'и не на кромках шпонок. Проверьте первые островки в слайсере.'))
-
-    def along_z(x, y, d):
-        return V(x, y, 40.-d)
-
-    keys = [(184., 12.6, 3.35, 4.4), (215., 9.4, 2.35, 4.4)]
-    fixed = _loft([_fin_wire(row[0]) for row in FIN])
-    fin = fixed.multiFuse([_blade(-1), _blade(1), *[_key(*k, along_z) for k in keys]])
-    cutters.extend(_key(*k, along_z, socket=True) for k in keys)
-    parts.append(_part('Fin', 'Киль с раскрытым воздушным тормозом',
-                       fin.removeSplitter(), (0, 0, 25), (10, -16, 0), _fin_paint,
-                       'Опоры под корневую кромку и низ раскрытых створок. '
-                       'Не ставьте контакты на рабочие грани шипов и тонкую заднюю кромку.'))
-    return parts, cutters
+        parts.append(_part(name, label, solid, (0, 28*sign, 0), (32*sign, -14, 0), wing_paint,
+                           'Опоры у корня и снизу вне шарнирного шва; не перекрыть микрорельеф '
+                           'плиточных швов и рабочие грани шпонок. Проверить в слайсере.'))
+    aft, sockets = tail()
+    return parts+aft, cutters+sockets

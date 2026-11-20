@@ -104,9 +104,14 @@
           <p id="scene-error" class="scene-error" role="status" hidden></p>
           <div id="model-tools" class="model-tools" hidden>
             <div class="control-line">
-              <div class="modes" role="group" aria-label="Положение деталей">
-                <button type="button" id="assembled" aria-pressed="true">В сборе</button>
-                <button type="button" id="exploded" aria-pressed="false">Разнести</button>
+              <div class="inspection">
+                <div class="modes" role="group" aria-label="Положение деталей">
+                  <button type="button" id="assembled" aria-pressed="true">В сборе</button>
+                  <button type="button" id="exploded" aria-pressed="false">Разнести</button>
+                </div>
+                <button type="button" id="underside" class="view-switch" aria-pressed="false">
+                  Днище без опор
+                </button>
               </div>
               <label class="part-picker" for="parts"
                 >Деталь<select id="parts">
@@ -114,6 +119,26 @@
                 </select></label
               >
             </div>
+            <fieldset class="mechanisms" id="mechanisms" hidden>
+              <legend>Раскрытие механизмов</legend>
+              <div class="hinge-controls">
+                <div>
+                  <label for="bay-opening">Грузовой отсек</label>
+                  <span id="bay-reading" aria-hidden="true">Закрыт</span>
+                  <input id="bay-opening" type="range" min="0" max="100" value="0" />
+                </div>
+                <div>
+                  <label for="brake-upper-opening">Тормоз: верхняя пара</label>
+                  <span id="brake-upper-reading" aria-hidden="true">Открыта</span>
+                  <input id="brake-upper-opening" type="range" min="0" max="100" value="100" />
+                </div>
+                <div>
+                  <label for="brake-lower-opening">Тормоз: нижняя пара</label>
+                  <span id="brake-lower-reading" aria-hidden="true">Открыта</span>
+                  <input id="brake-lower-opening" type="range" min="0" max="100" value="100" />
+                </div>
+              </div>
+            </fieldset>
             <div id="part-card" class="part-card" hidden>
               <div>
                 <h2 id="part-name"></h2>
@@ -150,8 +175,8 @@
             <label
               ><input type="radio" name="detail" value="fin" /><span class="detail-name">Киль</span
               ><span class="detail-note"
-                >У задней кромки киля расходятся две створки руля. На каждой видны линии стыков
-                панелей.</span
+                >Воздушный тормоз разделён по высоте. Верхняя и нижняя пары створок расходятся
+                в стороны от задней кромки киля.</span
               ></label
             >
             <label
@@ -179,7 +204,7 @@
             width="1000"
             height="800"
             loading="lazy"
-            alt="Две раскрытые створки с панелями на задней кромке киля"
+            alt="Киль с раскрытыми верхней и нижней парами створок воздушного тормоза"
           />
           <img
             class="detail-gear"
@@ -196,7 +221,7 @@
           <div class="workshop-head">
             <h2 id="workshop-title">Мастерская</h2>
             <p>
-              Откройте сборку в FreeCAD или загрузите в слайсер 12 деталей и два посадочных калибра.
+              Откройте сборку в FreeCAD или загрузите в слайсер 18 деталей и два посадочных калибра.
             </p>
           </div>
           <div class="downloads">
@@ -207,7 +232,7 @@
                 <use href="#i-download" /></svg
             ></a>
             <a class="download" href="files/Buran-STL.zip" download
-              ><span><strong>Комплект STL</strong><small>Все детали и калибры, ZIP</small></span
+              ><span><strong>Комплект STL</strong><small>Все детали и калибры, .zip</small></span
               ><svg class="icon" aria-hidden="true">
                 <use href="#i-download" /></svg
             ></a>
@@ -233,11 +258,11 @@
                 </div>
                 <div>
                   <dt>Корпус без шасси и подставки</dt>
-                  <dd id="orbiter">252,75 × 166,6 × 97,04 мм</dd>
+                  <dd id="orbiter">253,03 × 166,6 × 97,01 мм</dd>
                 </div>
                 <div>
                   <dt>Сборка на подставке</dt>
-                  <dd id="size">252,75 × 166,6 × 125,4 мм</dd>
+                  <dd id="size">253,03 × 166,6 × 125,4 мм</dd>
                 </div>
               </dl>
             </div>
@@ -271,21 +296,37 @@
                     поверхностях. Оставьте открытыми торцы крупных секций и слив Ø4,8 мм в носу,
                     чтобы промыть и досветить полости до сборки.
                   </p>
+                  <p>
+                    Подставка полая: снизу открыты двухмиллиметровая оболочка и рёбра жёсткости.
+                    Не перекрывайте отток смолы поддержками; после печати промойте промежутки
+                    между рёбрами и карманы трёх цоколей.
+                  </p>
                 </div>
               </details>
               <details>
                 <summary>Примерьте и соедините детали</summary>
                 <div>
                   <p>
-                    Сначала соберите модель без клея. Перед грунтом и окраской закройте стыки
-                    маской. Контактные поверхности оставьте без краски, затем снимите маску и
-                    склейте сборку.
+                    Сначала примерьте всё без клея. Перед грунтованием закройте маской цапфы,
+                    пазы и гнёзда. Склеивайте только неподвижные стыки корпуса, крыльев и киля.
                   </p>
                   <ol>
                     <li>Соедините нос, центроплан и корму.</li>
                     <li>Установите замыкающую панель и нижний щиток.</li>
-                    <li>Присоедините крылья и киль, вставьте в корпус три опоры шасси.</li>
-                    <li>Установите корабль на цоколи подставки.</li>
+                    <li>
+                      Присоедините крылья и киль. С каждой стороны киля вставьте штифт нижней
+                      панели тормоза в гнездо сверху вдоль оси, затем установите верхнюю панель.
+                      Снимайте в обратном порядке, раскрыв тормоз. Не заклеивайте шарниры.
+                    </li>
+                    <li>
+                      Приоткройте каждую створку отсека на 57° от закрытого положения. Снаружи
+                      одновременно введите обе цапфы в торцевые пазы и поверните створку до упора
+                      на 112°. Снимайте только при 57°, не отгибая щёки и не применяя клей.
+                    </li>
+                    <li>
+                      Вставьте три съёмные опоры шасси в корпус, затем опустите их на цоколи
+                      подставки. Оставьте посадки без клея.
+                    </li>
                   </ol>
                 </div>
               </details>
@@ -312,7 +353,8 @@
           <p>
             На снимках центр кормы закрывает музейный переход. Здесь его место занимает нейтральная
             заглушка без предполагаемых сопел. Лестницу не воспроизводили, подставку спроектировали
-            для модели.
+            для модели. Отсек и тормоз открываются на миниатюре: это не демонстрация работы
+            музейного экспоната.
           </p>
           <details class="sources">
             <summary id="sources-title">Источники реконструкции</summary>

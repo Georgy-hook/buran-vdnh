@@ -81,13 +81,13 @@ def _feature_tree(doc, key, construction):
             tool.Shape = shape
             tool.Visibility = False
             tools.append(tool)
-        if kind == 'cut':
+        if kind in ('cut', 'engrave'):
             # A compound of intersecting solids is NOT a valid single Boolean operand.
             cutter = tools[0] if len(tools) == 1 else _union(doc, step + 'Tools', 'Объединение резцов', tools)
             obj = doc.addObject('Part::Cut', name)
             obj.Base = current
             obj.Tool = cutter
-            obj.Refine = True
+            obj.Refine = kind != 'engrave'
             obj.Label = label
         elif kind == 'add':
             obj = _union(doc, name, label, [current, *tools])
@@ -144,6 +144,11 @@ def _metadata(obj, part):
     _property(obj, 'Vector', 'PrintRotationXYZ', 'Повороты печатной детали по X, Y и Z, градусы', V(*part.get('orientation', (0, 0, 0))))
     _property(obj, 'Vector', 'AssemblySize', 'Габариты в координатах сборки XYZ, мм', V(b.XLength, b.YLength, b.ZLength))
     _property(obj, 'String', 'PrintNote', 'Примечание для печати', part.get('note', ''))
+    if 'articulation' in part:
+        joint = part['articulation']
+        _property(obj, 'Vector', 'HingePivot', 'Точка на оси в координатах сборки, мм', V(*joint['pivot']))
+        _property(obj, 'Vector', 'HingeAxis', 'Единичный вектор оси в координатах сборки', V(*joint['axis']))
+        _property(obj, 'Angle', 'InspectionAngle', 'Поворот из экспозиционного во второе положение', joint['angle'])
 
 
 def _appearance(obj, part):

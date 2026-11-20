@@ -7,6 +7,7 @@ import struct
 import FreeCAD as App
 import MeshPart
 import numpy as np
+import Part
 
 from sections import V
 
@@ -81,7 +82,8 @@ def export(part, directory):
         raise ValueError(part['id']+': must be one CAD solid without a sealed cavity')
     path = directory / (part['id']+'.stl')
     errors = []
-    for lin, ang in [(0.035,.18), (.026,.14), (.048,.22)]:
+    trials = [(0.035,.18), (.026,.14), (.048,.22)]
+    for lin, ang in trials:
         mesh = MeshPart.meshFromShape(Shape=shape, LinearDeflection=lin, AngularDeflection=ang, Relative=False)
         mesh.transform(pose(part['orientation']))
         bb = mesh.BoundBox
@@ -97,7 +99,7 @@ def export(part, directory):
     if abs(result['meshVolumeMM3']/shape.Volume-1.0) > .009:
         raise ValueError(part['id']+': CAD and printed STL volumes differ by over 0.9%')
     return dict(id=part['id'], label=part['label'], group=part.get('group','Калибры'),
-                size=dims(shape.BoundBox), stl='files/stl/'+path.name,
+                size=dims(shape.optimalBoundingBox(False)), stl='files/stl/'+path.name,
                 orientation=list(part['orientation']), linearDeflection=lin,
                 angularDeflectionRad=ang, cadVolumeMM3=round(shape.Volume,3), **result)
 
@@ -106,7 +108,37 @@ JOINTS = set(frozenset(i.split('/')) for i in [
     'Nose/Bay','Bay/Aft','Aft/Stern','Stern/LowerFlap','Bay/WingPort','Bay/WingStarboard',
     'Aft/WingPort','Aft/WingStarboard','Aft/Fin','Nose/GearFront','Aft/BogiePort','Aft/BogieStarboard',
     'GearFront/Plinth','BogiePort/Plinth','BogieStarboard/Plinth',
+    'Bay/BayDoorPort','Bay/BayDoorStarboard',
+    'Fin/BrakePortLower','Fin/BrakePortUpper','Fin/BrakeStarboardLower','Fin/BrakeStarboardUpper',
 ])
+
+
+# All coincident points along a finely engraved seam are equally near. Asking
+# FreeCAD to enumerate the edge/face IDs of every solution is quadratic. A
+# point on both actual solids proves seating by the triangle inequality; if
+# a feature moves, fall back to the full minimum-distance calculation.
+_SEATS = {
+    frozenset(('Nose', 'Bay')): (72., 1.4, 1.62),
+    frozenset(('Bay', 'Aft')): (160., 1.4, 1.62),
+    frozenset(('Aft', 'Stern')): (232., 1.4, 1.62),
+    frozenset(('Stern', 'LowerFlap')): (235.2, .7, 3.8),
+    frozenset(('Aft', 'Fin')): (192.4, 1.18, 40.),
+    frozenset(('Nose', 'GearFront')): (57.3, .58, 5.8),
+}
+for _hand, _side in [('Port', -1), ('Starboard', 1)]:
+    _SEATS[frozenset(('Bay', 'Wing'+_hand))] = (128.1, 20.*_side, 7.12)
+    _SEATS[frozenset(('Aft', 'Wing'+_hand))] = (164.2, 20.*_side, 7.12)
+    _SEATS[frozenset(('Aft', 'Bogie'+_hand))] = (174.4, 12.7*_side, 5.8)
+    _SEATS[frozenset(('Bay', 'BayDoor'+_hand))] = (76.9, 1.2*_side, 37.9)
+
+
+def seating_distance(a, b, ids):
+    if ids in _SEATS:
+        witness = Part.Vertex(V(*_SEATS[ids]))
+        upper_bound = witness.distToShape(a)[0] + witness.distToShape(b)[0]
+        if upper_bound <= .00001:
+            return upper_bound
+    return a.distToShape(b)[0]
 
 
 def assembly_check(parts):
@@ -116,10 +148,14 @@ def assembly_check(parts):
     matched = set()
     collisions = []
     for i,p in enumerate(parts):
+        print(f"Контакты: {p['id']}", flush=True)
         a = p['shape']
-        all_bb.add(a.BoundBox)
+        # A loose extrema box is fine for culling collision pairs, but it
+        # includes unused spline poles above the fin. Quote physical extents.
+        exact_bounds = a.optimalBoundingBox(False)
+        all_bb.add(exact_bounds)
         if p['group'] != 'Шасси и стенд':
-            ship_bb.add(a.BoundBox)
+            ship_bb.add(exact_bounds)
         for q in parts[i+1:]:
             b = q['shape']
             name = f"{p['id']}/{q['id']}"
@@ -129,7 +165,7 @@ def assembly_check(parts):
             if abs(overlap) > .002:
                 collisions.append(f'{name} = {overlap:.4f} mm³')
             if required in JOINTS:
-                distance = a.distToShape(b)[0]
+                distance = seating_distance(a, b, required)
                 if distance > .002:
                     collisions.append(f'{name} seating gap {distance:.4f} mm')
                 matched.add(required)

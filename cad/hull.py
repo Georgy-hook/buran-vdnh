@@ -4,10 +4,14 @@ import math
 import Part
 
 from cockpit import cockpit, glazing_color
+from nose_detail import cover_color, covers, tip_cap, tip_color
+from nose_tiles import tile_tools
 from fairing import color as fairing_color, shoulder
+from belly import engravers, flap_tools, skirt_height, skirt_tools
+from baydoors import operations as bay_opening
 from sections import (V, NOSE, PORCELAIN, TILES, TILE_EDGE, RED, box, compound,
                       cut, fuse, inset, item, mid, poly, shell_blank, station_at)
-from skin import belt_z, cap_x, hinges, markings, nose_tools, panel_tools
+from skin import belt_z, hinges, markings, nose_tools, panel_tools
 
 
 class Work:
@@ -20,7 +24,12 @@ class Work:
 
     def apply(self, kind, label, tools):
         if tools:
-            self.shape = (cut if kind == 'cut' else fuse)(self.shape, tools)
+            if kind == 'engrave':
+                # Disjoint grooves are one compound operand. Keep the planar
+                # cutting faces; refining all tile lands changes no geometry.
+                self.shape = self.shape.cut(tools, 1.e-7)
+            else:
+                self.shape = (cut if kind == 'cut' else fuse)(self.shape, tools)
             self.operations.append((kind, label, tools))
 
     def finish(self, *args, **kwargs):
@@ -50,14 +59,20 @@ def local_tools(tools, x0, x1):
     return [s for s in tools if s.BoundBox.XMin < x1 and s.BoundBox.XMax > x0]
 
 
-def nose_color(panes):
+def nose_color(panes, lids):
     def paint(x, y, z):
         if 28 < x < 57 and z > 26:
             shade = glazing_color(panes, V(x, y, z))
             if shade:
                 return shade
-        if x < cap_x(z):
-            return TILE_EDGE
+        if 7.5 < x < 49.0 and z > 9.40:
+            shade = cover_color(lids, V(x,y,z))
+            if shade:
+                return shade
+        if x < 7.8:
+            shade = tip_color(x, y, z)
+            if shade:
+                return shade
         if z <= belt_z(x)+.03:
             return TILES
         return PORCELAIN
@@ -65,7 +80,7 @@ def nose_color(panes):
 
 
 def shell_color(x, y, z):
-    if abs(y) > 20.015 and 162.5 < x < 187.5 and 16.3 < z < 25.32:
+    if abs(y) > 20.015 and 162.5 < x < 187.5 and 13.2 < z < 22.72:
         return '#23272b'
     if 190.0 < x < 197.4 and abs(y) > 20.01 and 18.0 < z < 25.1:
         return '#d1ad71' if abs(y) > 20.35 else RED
@@ -73,7 +88,7 @@ def shell_color(x, y, z):
         accent = fairing_color(x,y,z)
         if accent:
             return accent
-    if z < 6.51 or (x >= 219 and z < min(15.1, 6.5+math.floor((x-218)/2.1)*1.3)):
+    if z < skirt_height(x)+.04:
         return TILES
     if abs(y)>20.025 and 26.1 < z < 27.05:
         return '#c7c7bd'
@@ -83,20 +98,28 @@ def shell_color(x, y, z):
 def fore(tools):
     work = Work(NOSE)
     window_cuts, panes = cockpit(work.shape)
+    lid_cuts, lids = covers(work.shape)
+    courses, joints = tile_tools(work.shape)
+    cup, reveal = tip_cap(work.shape)
     inside = [inset(station_at(x), 4.8, 3.0, 3.6) for x in (14, 22, 34, 49, 62, 72, 73)]
     # The large keyed end is open; the second, vented opening is low on the nose.
     # Core starts aft of the cap, and leaves material locally for the nose gear socket.
     core = shell_blank(inside)
     core = core.cut(box(47, -5.6, -1, 14.8, 11.2, 13))
     drain = Part.makeCylinder(2.4, 18, V(15.1, 0, -3), V(0, 0, 1))
+    work.apply('add', 'Овальный колпак с выступающей кромкой', [cup])
+    work.apply('cut', 'Наклонная кольцевая канавка вокруг колпака', [reveal])
     work.apply('cut', 'Открытая полость и слив в нижней панели', [core, drain])
     work.apply('cut', 'Остекление кабины · глухие плоские выборки в обводе и тонкий переплёт', window_cuts)
-    work.apply('cut', 'Ступенчатая маска, окантовки и стыки носа', nose_tools())
+    work.apply('cut', 'Ряды теплозащиты по обводу · поперечные швы', [courses])
+    work.apply('cut', 'Разбежка плиток на днище и боках · продольные швы', [joints])
+    work.apply('cut', 'Маска в два уступа, люки и стыки листовых панелей', nose_tools())
+    work.apply('cut', 'Глухие крышки бортовых панелей и верхние два ряда', lid_cuts)
     work.apply('add', 'Передний разъём · две шпонки с заходными фасками', keys(72))
     work.apply('cut', 'Ложе носовой стойки', local_tools(tools, 0, 72))
     return work.finish('Nose', 'Нос и кабина экипажа', PORCELAIN, (-37,0,5), (12,52,0),
                        'Поддержки — на торце и снизу, не на стёклах. Промыть из открытого торца через слив Ø4,8 мм.',
-                       paint=nose_color(panes))
+                       paint=nose_color(panes,lids))
 
 
 def trunk(tools, aft):
@@ -109,7 +132,11 @@ def trunk(tools, aft):
         core = cut(core, bosses)
     work.apply('cut', 'Сквозной промывочный канал', [core])
     work.apply('cut', 'Расшивка створок, люков и днища', panel_tools(x0,x1))
+    if aft:
+        work.apply('cut', 'Ступенчатое поле под кормовой накладкой', skirt_tools(x0,x1))
     work.apply('add', 'Наружные петли створок', hinges(x0,x1))
+    for kind, label, shapes in bay_opening(x0, x1):
+        work.apply(kind, label, shapes)
     if aft:
         work.apply('add', 'Бортовая надпись и флаг · обе стороны', markings())
         work.apply('add', 'Кормовые накладки · рельеф боковин, скоса и торца', [shoulder(-1), shoulder(1)])
@@ -119,6 +146,9 @@ def trunk(tools, aft):
     if aft:
         joint_tools += keys(232, female=True, sign=-1)
     work.apply('cut', 'Приёмные гнёзда секций и навесных узлов', joint_tools)
+    courses, cross = engravers(x0, x1)
+    work.apply('engrave', 'Теплозащита · пояса по дуге днища', [courses])
+    work.apply('engrave', 'Теплозащита · короткие швы со сдвигом в полплитки', [cross])
     if aft:
         return work.finish('Aft', 'Кормовая секция с бортовой маркировкой', PORCELAIN, (29,0,2), (13,-53,0),
                            'Защищайте буквы и боковые накладки. Сквозь оба торца промыть и досветить полость до сборки.', paint=shell_color)
@@ -131,6 +161,7 @@ def flap_parts():
     skin = shell_blank([mid(232), (235.2, 19.8, .18, 6.5, 26.5, 39.45)])
     # The fixed fairings extend past the hull joint. Give the cover two cutaways.
     skin = cut(skin, [box(231.8, y, 23.0, 3.2, 6.5, 11.9) for y in (-23,16.5)])
+    skin = cut(skin, skirt_tools(232.,235.2))
     skin = fuse(skin, keys(232, sign=-1))
     rear = box(234.65, -11, 10.2, 1.0, 22.0, 20.0)
     rear_inner = box(234.5, -10.45, 10.75, 1.4, 20.90, 18.90)
@@ -146,6 +177,7 @@ def flap_parts():
                           foil(252.75, 13.4, 2.80, 1.05)], True, True)
     flap = fuse(flap, [box(232.1, y, 2.55, 3.6, 4, 2.30) for y in (-10,6)])
     flap = cut(flap, [box(238.0, -16, 4.55, .38, 32, 1.5), box(239,-.21,4.15,13,.42,1.9)])
+    flap = cut(flap, flap_tools())
     panel = item('LowerFlap', 'Нижний кормовой щиток', flap, TILES, (69,0,-8),
                  (32,12,0), 'Начать с внутренней кромки; не ставить опоры на два шипа.')
     return cover, panel

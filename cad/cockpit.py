@@ -8,17 +8,18 @@ exterior interpretation of the museum exhibit at 1:144, not production data.
 import Part
 import numpy as np
 
-from sections import FRAME, GLASS, V, bezier
+from sections import FRAME, V, bezier
 
 # XY outlines on the starboard brow, starting at the inboard sill corner.
 # Each quadrilateral is fitted to one plane on the curved skin below.
 LIGHTS = (
-    ((32.9, .34), (34.2, 10.49), (42.45, 8.41), (41.65, .34)),
-    ((34.65, 10.98), (41.49, 15.13), (46.95, 12.01), (42.92, 8.92)),
-    ((42.09, 15.43), (51.64, 17.06), (53.68, 14.15), (47.36, 12.44)),
+    # White centre post grows towards the roof (Moscow 2026-03-31 23).
+    ((34.15, 1.04), (35.49, 10.19), (44.75, 7.82), (44.10, 2.65)),
+    ((35.84, 10.51), (42.25, 15.93), (48.84, 11.45), (45.04, 8.17)),
+    ((42.66, 16.21), (51.64, 17.15), (54.15, 12.78), (49.20, 11.82)),
 )
-FRAME_WIDTH = .45
-GLASS_DEPTH = .34
+FRAME_WIDTH = .36
+GLASS_DEPTH = .26
 
 
 def _unit(v):
@@ -72,20 +73,28 @@ def _pane(blank, footprint, sill):
     glass_face = Part.Face(_rounded([p - GLASS_DEPTH*n for p in inner], .35))
     # Both blind prisms point OUTWARDS. The glazing floor and ring remain
     # integral material; no enclosed void and no thin attached window strips.
-    cutter = rim_face.extrude(5.*n).fuse(glass_face.extrude(5.*n)).removeSplitter()
+    tools = [glass_face.extrude(5.*n)]
     centre = sum(points, V()) * .25
     edges = []
-    for p, q in zip(points, points[1:] + points[:1]):
+    for i, (p, q) in enumerate(zip(points, points[1:] + points[:1])):
         toward = _unit(n.cross(q-p))
         if (centre-p).dot(toward) < 0:
             toward = -toward
         edges.append((p, toward))
+        # Small blind seats follow the metal surround, outside the gasket.
+        width = sill if i == 0 else FRAME_WIDTH
+        count = max(2, int((q-p).Length/1.55))
+        for j in range(count):
+            f = .12 + .76*(j+.5)/count
+            head = p + f*(q-p) + .53*width*toward - .115*n
+            tools.append(Part.makeCylinder(.095, .32, head, n))
+    cutter = rim_face.extrude(5.*n).fuse(tools).removeSplitter()
     return cutter, (points[0], n, centre, edges, sill)
 
 
 def cockpit(blank):
     cutters, panes = [], []
-    for footprint, sill in zip(LIGHTS, (.74, .90, .58)):
+    for footprint, sill in zip(LIGHTS, (.48, .54, .42)):
         for side in (-1, 1):
             tool, pane = _pane(blank, [(x, y*side) for x, y in footprint], sill)
             cutters.append(tool)
@@ -103,7 +112,7 @@ def glazing_color(panes, p):
             continue
         if all((p-a).dot(to_inside) > -.03 for a, to_inside in edges):
             if on_glass:
-                return GLASS
+                return '#292e36'  # Opaque, near-neutral museum covers, not blue glass.
             if distance < -.012:
                 return FRAME  # The inner wall is the gasket, not white porcelain.
             sill_distance = (p - edges[0][0]).dot(edges[0][1])

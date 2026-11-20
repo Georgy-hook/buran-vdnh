@@ -49,6 +49,8 @@
         id: item.id,
         node,
         origin: node.position.clone(),
+        anchor: node.position.clone(),
+        articulation: item.articulation,
         delta: new T.Vector3(...item.explode),
         surfaces: [],
       });
@@ -66,6 +68,7 @@
       if (!part.surfaces.length) throw new Error('В одной из деталей отсутствуют поверхности.');
       part.bounds = new T.Box3().setFromObject(part.node);
       part.points = window.BuranStudio.supportPoints(T, part.surfaces);
+      part.hinge = window.BuranStudio.hingeFor(T, part, part.articulation);
     }
     return { parts, owners };
   }
@@ -133,12 +136,16 @@
     const light = window.BuranStudio.illuminate(T, renderer, scene);
     const camera = new T.PerspectiveCamera(23, 1, 0.0001, 10);
     const home = new T.Vector3(-0.53, 0.92, 1.12).normalize();
+    const below = new T.Vector3(-0.32, -1.32, 0.68).normalize();
+    const plinthBelow = new T.Vector3(-0.31, -1.12, 0.84).normalize();
+    const supports = new Set(['Plinth', 'GearFront', 'BogiePort', 'BogieStarboard']);
     // Catalogue crops in the assembled GLB's world frame (aft, up, port), metres.
     // Span is the minimum width/height of the photograph at its subject plane.
     const views = new Map([
       ['cockpit', { at: [0.043, 0.027, 0.003], eye: [-0.86, 0.49, 1.07], span: [0.078, 0.054] }],
       ['fin', { at: [0.202, 0.061, 0.001], eye: [0.47, 0.34, 1.16], span: [0.092, 0.084] }],
       ['gear', { at: [0.168, -0.009, 0.023], eye: [-0.89, 0.14, 1.05], span: [0.044, 0.036] }],
+      ['opened', { at: [0.117, 0.032, 0], eye: [-0.38, 1.36, 0.86], span: [0.127, 0.101] }],
     ]);
     const foot = Array.from(parts.values()).reduce((a, b) =>
       a.bounds.min.y < b.bounds.min.y ? a : b,
@@ -156,6 +163,9 @@
     const highlights = new Map();
     let selected = null;
     let isolated = null;
+    let assemblyEye = null;
+    let underside = false;
+    const opening = { bay: 0, brakeUpper: 1, brakeLower: 1 };
     let detail = null;
     let amount = 0;
     let destination = 0;
@@ -166,9 +176,10 @@
     let lost = false;
 
     const currentEye = () => camera.position.clone().sub(orbit.target).normalize();
+    const visible = (part) => isolated ? part.id === isolated : !underside || !supports.has(part.id);
     function frame(eye, value) {
       const fit = window.BuranStudio.framing(
-        T, parts, camera.aspect, camera.fov, eye, isolated, value,
+        T, parts, camera.aspect, camera.fov, eye, visible, value,
       );
       if (detail) {
         fit.center.set(...detail.at);
@@ -180,7 +191,11 @@
     function lightScene(fit, contact) {
       const part = isolated ? parts.get(isolated) : foot;
       const offset = part.delta.clone().multiplyScalar(amount);
-      light(fit.bounds, fit.radius, contact ? part : null, offset);
+      // An underside inspection hangs in space. A turned leaf no longer has
+      // the same floor contact as its cached footprint in the museum pose.
+      const inspectUnderside = underside || isolated === 'Plinth';
+      const grounded = contact && !inspectUnderside && !part.poseBounds;
+      light(fit.bounds, fit.radius, grounded ? part : null, offset, inspectUnderside);
     }
     function placeCamera(center, eye, distance) {
       orbit.target.copy(center);
@@ -190,8 +205,8 @@
     function placeParts(value) {
       amount = value;
       for (const part of parts.values()) {
-        part.node.position.copy(part.origin).addScaledVector(part.delta, value);
-        part.node.visible = !isolated || part.id === isolated;
+        part.node.position.copy(part.anchor).addScaledVector(part.delta, value);
+        part.node.visible = visible(part);
       }
     }
     function setRange(fit) {
@@ -233,8 +248,43 @@
     }
     orbit.addEventListener('change', dirty);
 
+    function pose(control, fraction) {
+      opening[control] = fraction;
+      // The museum pose is the closed bay and an already split air brake.
+      const travel = control === 'bay' ? fraction : 1 - fraction;
+      for (const part of parts.values()) {
+        if (part.hinge?.control === control) part.hinge.set(travel);
+      }
+    }
+    function setOpening(control, fraction) {
+      if (!Object.hasOwn(opening, control) || !Number.isFinite(fraction)) return false;
+      settle();
+      const eye = currentEye();
+      const before = frame(eye, amount);
+      const scale = camera.position.distanceTo(orbit.target) / before.distance;
+      pose(control, Math.min(1, Math.max(0, fraction)));
+      placeParts(amount);
+      const after = frame(eye, amount);
+      setRange(after);
+      // Keep the current crop/zoom when the visitor moves the hinge by hand.
+      const target = orbit.target.clone().sub(before.center).add(after.center);
+      placeCamera(target, eye, scale * after.distance);
+      lightScene(after, !amount);
+      dirty();
+      return true;
+    }
+    function inspectBottom(active) {
+      detail = null;
+      isolated = null;
+      select(null, false);
+      destination = 0;
+      underside = active;
+      snap(active ? below : home);
+    }
+
     function explode(value) {
       detail = null;
+      underside = false;
       destination = value ? 1 : 0;
       if (reduced.matches || isolated) {
         snap();
@@ -274,8 +324,11 @@
       const next = solo ? selected : null;
       if (next !== isolated) {
         detail = null;
+        const eye = currentEye();
+        if (!isolated) assemblyEye = eye;
         isolated = next;
-        snap();
+        snap(next === 'Plinth' ? plinthBelow : next ? eye : assemblyEye || eye);
+        if (!next) assemblyEye = null;
       }
       if (selected && !isolated) {
         for (const mesh of parts.get(selected).surfaces) {
@@ -293,14 +346,20 @@
     }
     function setView(name, opts = {}) {
       const preset = views.get(name);
-      if (name !== 'home' && !preset) return false;
+      if (!['home', 'underside', 'plinth-under'].includes(name) && !preset) return false;
+      if (name === 'plinth-under' && !parts.has('Plinth')) return false;
       resize();
       destination = 0;
       anim = null;
       isolated = null;
       select(null, false);
+      underside = name === 'underside';
+      pose('bay', name === 'opened' ? 1 : 0);
+      pose('brakeUpper', 1);
+      pose('brakeLower', 1);
       detail = preset || null;
-      snap(preset ? new T.Vector3(...preset.eye).normalize() : home);
+      if (name === 'plinth-under') select('Plinth', true);
+      else snap(preset ? new T.Vector3(...preset.eye).normalize() : underside ? below : home);
       if (opts?.instant) renderNow();
       return true;
     }
@@ -379,6 +438,9 @@
       select,
       explode,
       zoom,
+      setOpening,
+      inspectBottom,
+      isSupport: (id) => supports.has(id),
       setView,
       snapshot() {
         resize();

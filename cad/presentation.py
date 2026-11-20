@@ -29,9 +29,11 @@ def _linear(channel):
 
 def finish(color):
     """Metalness/roughness of the *miniature's finish*, not flight specifications."""
-    if color in ('#263c4c', '#1d333e', '#243943'):
+    if color in ('#263c4c', '#1d333e', '#243943', '#292e36'):
         return .04, .17  # deep, reflective glazing; not a transparent hollow body
-    if color in ('#626b70', '#a4aeac', '#828c89', '#606769'):
+    if color == '#292d32':
+        return .08, .35  # smooth dark tip, contrasting subtly with the matte tiles
+    if color in ('#626b70', '#a4aeac', '#828c89', '#606769', '#697073'):
         return .50, .46  # metal surrounds, oleos and gear hardware
     if color in ('#232a2b', '#343b3e', '#2c3033', '#43484c', '#292d30',
                  '#323539', '#32383d', '#475057', '#383b3c'):

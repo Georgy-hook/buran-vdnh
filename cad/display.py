@@ -81,29 +81,30 @@ def _lerp(a, b, t):
     return tuple(i + (j - i)*t for i, j in zip(a, b))
 
 
-def _tyre(x, y, z, r, w, front):
-    """Turn the sidewall, bead seat, hub, round shoulder and tread in one profile."""
-    # (radial, axial) pairs in a meridian; outward facing rim is recessed.
-    side = [(0, .51*w), (.12*r, .51*w), (.15*r, .59*w), (.24*r, .59*w),
-            (.265*r, .505*w), (.445*r, .505*w), (.46*r, .57*w),
-            (.50*r, .57*w), (.54*r, .51*w), (.59*r, .55*w),
-            (.76*r, .54*w), (.875*r, .49*w), (.96*r, .40*w), (.985*r, .33*w)]
-    section = [(rad, -u) for rad, u in side]
-    for t in (-.225, 0, .225):
+# 4510: width of each main tyre is about .43 projected wheel diameters;
+# the clear strip between them is about .32 diameters. No aircraft dimensions
+# are inferred from the near edge of the strongly foreshortened door.
+def _wheel_size(front):
+    return (3.35, 2.28, 2.50) if front else (4.25, 3.62, 3.56)
+
+
+def _tyre(x, y, z, r, w, inside):
+    """One turned section; its exposed face is not a perforated brake rotor."""
+    # Angles of the wheel axis are mirrored locally: +u always faces the strut.
+    outer = [(0, -.54*w), (.18*r, -.54*w), (.23*r, -.46*w),
+             (.42*r, -.43*w), (.47*r, -.53*w), (.53*r, -.53*w),
+             (.56*r, -.49*w), (.70*r, -.52*w), (.83*r, -.50*w),
+             (.94*r, -.44*w), (.985*r, -.37*w)]
+    section = list(outer)
+    for t in (-.245, 0, .245):
         u = t*w
-        section.extend([(r, u-.12), (r-.15, u-.055), (r-.15, u+.055), (r, u+.12)])
-    section.extend(reversed(side))
-    face = Part.Face(_wire([(rad, u, 0) for rad, u in section]))
+        section.extend([(r, u-.15), (r-.16, u-.075), (r-.16, u+.075), (r, u+.15)])
+    section.extend([(.985*r, .37*w), (.94*r, .44*w), (.83*r, .50*w),
+                    (.70*r, .52*w), (.52*r, .49*w), (.48*r, .54*w),
+                    (.45*r, .54*w), (.43*r, .61*w), (.36*r, .61*w),
+                    (.34*r, .68*w), (.25*r, .68*w), (.23*r, .58*w), (0, .58*w)])
+    face = Part.Face(_wire([(rad, u*inside, 0) for rad, u in section]))
     wheel = face.revolve(O, Y, 360)
-    bores = []
-    count = 5 if front else 6
-    for i in range(count):
-        angle = math.tau*i/count
-        dx, dz = .355*r*math.cos(angle), .355*r*math.sin(angle)
-        for sign in (-1, 1):
-            bores.append(Part.makeCylinder(.21 if front else .30, .68,
-                         V(dx, sign*(w*.505-.37), dz), V(0, sign, 0)))
-    wheel = wheel.cut(Part.makeCompound(bores)).removeSplitter()
     wheel.translate(V(x, y, z))
     return wheel
 
@@ -125,90 +126,133 @@ def _shoe(front, sign):
     return solid, cutter
 
 
-def _door(sign):
-    # A thickened inboard bay door, lowered on two hinge lugs. The opening
-    # between door and strut is not boxed in: resin and wash can escape.
-    outline = [(163.9, -2), (175.8, -2), (176.35, -2.65), (175.9, -9.95),
-               (175.35, -10.55), (163.8, -10.55), (163.2, -9.95), (163.35, -2.65)]
-    def inner(z):
-        return 11.05 + (-z - 2)*.21
-    face = Part.Face(_wire([(x, sign*inner(z), z) for x, z in outline]))
-    pieces = [face.extrude(V(0, sign*1.12, 0))]
-    for x in (165.7, 174.55):
-        pieces.append(_cyl((x, sign*12.3, -2.45), (x, sign*15.0, -2.45), .74))
-        pieces.append(_cyl((x, sign*14.9, -2.45), (x, sign*13.2, 3.95), .74))
-        # Low ribs on the inside face echo the stamped panel in 4510.
-        pieces.append(_cyl((x, sign*(inner(-2.5)+1.12), -2.5),
-                           (x, sign*(inner(-9.95)+1.12), -9.95), .31))
-    return pieces
+def _panel(x, y, z, length, height, thick, sign, bevel):
+    # Chamfer in the XZ plane, extrusion towards the aircraft centreline.
+    outline = _rect(x, z, length, height, bevel)
+    return Part.Face(_wire([(px, y, pz) for px, pz in outline])).extrude(V(0, -sign*thick, 0))
+
+
+def _hook(x, sign, y, z, scale):
+    # The three curved arms in 4510 stand away from the back of the panel.
+    # A band with two *arcs* leaves daylight below the short upper rail.
+    def pt(d, h):
+        return V(x-.54*scale, sign*(y+d*scale), z+h*scale)
+    a, b, c = pt(-2.5, 0), pt(-1.65, 0), pt(-.42, -4.2)
+    d, e, f = pt(-.13, -4.5), pt(-.83, -4.69), pt(-1.23, -4.48)
+    edges = [Part.makeLine(a, b), Part.Arc(b, pt(-1.80, -2.30), c).toShape(),
+             Part.makeLine(c, d), Part.makeLine(d, e), Part.makeLine(e, f),
+             Part.Arc(f, pt(-2.65, -2.3), a).toShape()]
+    return Part.Face(Part.Wire(edges)).extrude(V(1.08*scale, 0, 0))
+
+
+def _door(front, sign):
+    # 4508, aft quarter: the OUTER (dark) door actually overlaps the wheel in
+    # projection. 4510 shows a mostly plain green insert and the three hooks.
+    # Only the visible forward panel is reproduced (4508 / 4542).
+    x, y, top, bottom, length = ((53.6, 5.52, -3.16, -11.88, 12.4) if front else
+                                 (165.4, 28.64, -3.30, -14.87, 24.6))
+    z, height = (top+bottom)/2, top-bottom
+    parts = [_panel(x, sign*y, z, length, height, .90, sign, .52),
+             _panel(x, sign*(y-.82), z, length-.98, height-.86, .34, sign, .40)]
+    # Thin stamped inspection cover, not generic rows of rivets. Flush outside.
+    if not front:
+        parts.append(_panel(x+2.5, sign*(y-1.13), z+1.8, 5.6, 4.8, .25, sign, .25))
+    hinges = (x-length*.405, x-1.17, x+length*.405) if not front else (x-4.4, x+4.0)
+    scale = .83 if front else 1.
+    axis_y = y-2.12*scale
+    hinge_z = -1.0
+    parts.append(_cyl((hinges[0]-.26, sign*axis_y, hinge_z),
+                      (hinges[-1]+.26, sign*axis_y, hinge_z), .59))
+    for hx in hinges:
+        parts.extend([_hook(hx, sign, y, hinge_z, scale),
+                      _cyl((hx-.77, sign*axis_y, hinge_z),
+                           (hx+.77, sign*axis_y, hinge_z), .76)])
+    return parts
 
 
 def _gear_paint(x, y, z, *, front, sign):
     cx, cy = (54, 0) if front else (169, sign*22)
-    r, w, spacing = (3.35, 2.45, 2.55) if front else (4.25, 3.15, 3.30)
+    r, w, spacing = _wheel_size(front)
     radial = math.hypot(x-cx, z-(GROUND+r-.23))
-    nearest = abs(abs(y-cy)-spacing)
-    if nearest <= w*.61+.012 and radial <= r+.015:
-        return '#232a2b' if radial > .54*r else '#456651'
-    if not front and -10.58 <= z <= -1.94 and 163.15 < x < 176.4:
-        if abs(y) < 12.6 + (-z-2)*.21:
-            return '#63765c'
-    if z <= GROUND+2.45:
-        return '#606769'
-    # Give the chrome only to the exposed piston surface. A simple threshold
-    # on global Z would cut obliquely across its triangular display facets.
-    ax, ay, az = cx, cy, GROUND+r-.32
-    bx, by = (53.6, 0) if front else (171.0, sign*12.6)
-    dx, dy, dz = bx-ax, by-ay, 4.30-az
-    t = ((x-ax)*dx + (y-ay)*dy + (z-az)*dz) / (dx*dx + dy*dy + dz*dz)
-    if .19 < t < .345:
-        rho = math.sqrt((x-ax-t*dx)**2 + (y-ay-t*dy)**2 + (z-az-t*dz)**2)
-        if rho < (1.03*(.86 if front else 1) + .02):
-            return '#a4aeac'
-    return '#828c89'
+    dy = abs(y-cy)
+    if abs(dy-spacing) < w*.69+.01 and radial <= r+.02:
+        if radial > .52*r:
+            return '#232728'
+        return '#456651' if dy < spacing else '#333b3b'
+    edge = 5.52 if front else 28.64
+    top = -3.16 if front else -3.30
+    if z < top+.05 and abs(abs(y)-edge) < 1.50 and abs(y) > edge-1.52:
+        # Exterior is dark belly TPS; the inner face and lip are green.
+        if abs(y) >= edge-.05:
+            return '#33393c'
+        return '#557557'
+    if z < GROUND+2.76:
+        return '#555e60'
+    return '#969e9c'
 
 
 def _gear(front, sign=1):
     x, y = (54, 0) if front else (169, sign*22)
-    r, w, spacing = (3.35, 2.45, 2.55) if front else (4.25, 3.15, 3.30)
+    r, w, spacing = _wheel_size(front)
     z = GROUND + r - .23
-    wheels = [_tyre(x, y+k*spacing, z, r, w, front) for k in (-1, 1)]
-    # Two broad coplanar tyre flats form an actual bearing surface on the plinth.
+    wheels = [_tyre(x, y+k*spacing, z, r, w, -k) for k in (-1, 1)]
     floor = Part.makeBox(30, 30, 10, V(x-15, y-15, GROUND-10))
-    wheels = [wheel.cut(floor) for wheel in wheels]
-    pieces = wheels + [_cyl((x, y-spacing, z), (x, y+spacing, z), .87 if front else 1.12)]
-    pieces.append(_pin(x, y))
-    base = _rect(x, y, 3.75, 2.7, .34)
-    neck = _rect(x, y, 1.72, 1.62, .23)
-    pieces.append(_loft([(GROUND, base), (GROUND+.37, base), (z+.14, neck)]))
+    pieces = [wheel.cut(floor) for wheel in wheels]
+    pieces.extend([_cyl((x, y-spacing, z), (x, y+spacing, z), .80 if front else 1.02),
+                   _pin(x, y)])
+    # Exhibition jack between the wheels: broad tapered foot with screw neck.
+    foot = _rect(x, y, 3.64, 2.80, .19)
+    tip = _rect(x, y, 1.24, 1.20, .14)
+    pieces.extend([_loft([(GROUND, foot), (GROUND+.31, foot), (z-1.0, tip)]),
+                   _cyl((x, y, z-1.25), (x, y, z), .56)])
     shoe, cutter = _shoe(front, sign)
     pieces.append(shoe)
-    a = (x, y, z-.09)
-    b = (53.6, 0, 4.30) if front else (171.0, sign*12.6, 4.30)
-    # Main telescopic oleo, collars and axle knuckle.
-    scale = .86 if front else 1.0
-    pieces.append(_cyl(a, b, 1.03*scale))
-    for t0, t1, radius in [(.00,.20,1.38), (.34,.91,1.43), (.33,.39,1.59),
-                           (.69,.735,1.54), (.89,.99,1.64)]:
-        pieces.append(_cyl(_lerp(a,b,t0), _lerp(a,b,t1), radius*scale))
-    # Spread V-braces land inside the plate's rim; both remain >=1.2 mm diameter.
-    for direction in (-1, 1):
-        start = _lerp(a, b, .20)
-        end = ((54+direction*3.9, direction*2.46, 4.24) if front else
-               (170.75+direction*4.55, sign*(12.5+direction*1.04), 4.24))
-        pieces.append(_cyl(start, end, .63 if front else .76))
-        pieces.append(_cyl(_lerp(start,end,.20), _lerp(start,end,.88), .79 if front else .91))
-    # Articulated torque link with visible knee on the aft face of the column.
-    t0, t1 = _lerp(a,b,.10), _lerp(a,b,.46)
-    knee = (x+2.7*scale, (t0[1]+t1[1])/2, (t0[2]+t1[2])/2)
-    pieces.extend([_cyl(t0,knee,.60*scale), _cyl(knee,t1,.60*scale),
-                   _cyl((knee[0],knee[1]-.61,knee[2]),
-                        (knee[0],knee[1]+.61,knee[2]),.70*scale)])
-    if not front:
-        pieces.extend(_door(sign))
+    top_y = 0 if front else sign*20.9
+    top_x = 54.65 if front else 170.5
+    a, b = (x, y, z-.16), (top_x, top_y, -.92)
+    scale = .79 if front else 1.
+    pieces.append(_cyl(a, b, .99*scale))
+    for start, end, radius in [(0,.20,1.14), (.38,.93,1.16), (.375,.445,1.31),
+                               (.738,.785,1.24), (.87,1.0,1.43)]:
+        pieces.append(_cyl(_lerp(a,b,start), _lerp(a,b,end), radius*scale))
+    # Stiff links and their visible pin joints are spread across the rail,
+    # not all converging on the narrow CAD mount behind the belly.
+    pin = _lerp(a, b, .28)
+    shoulder_y = 0 if front else sign*12.72
+    edge_y = 3.76 if front else sign*26.52
+    span = 3.50 if front else 4.50
+    if front:
+        pieces.append(_cyl((top_x-span, 0, -.94), (top_x+span, 0, -.94), .73))
+    for k in (-1, 1):
+        xx = top_x+k*span
+        knee = (xx, shoulder_y, -.94)
+        upper = (xx, shoulder_y, 4.00)
+        end = (xx, edge_y, -1.0)
+        # Ends meet the upper plate *within* its socket footprint.
+        pieces.extend([_cyl(upper, knee, .68 if front else .86),
+                       _cyl(knee, end, .68 if front else .80)])
+        if not front:
+            pieces.append(_cyl(b, knee, .86*scale))
+        target = knee if k == -1 else end
+        pieces.extend([_cyl(pin, target, .67*scale),
+                       _cyl(_lerp(pin,target,.10), _lerp(pin,target,.88), .82*scale)])
+    # Short articulating link, aft of the axle, visible between the tyres.
+    p0, p1 = _lerp(a,b,.03), _lerp(a,b,.32)
+    knee = (x+2.37*scale, y, z+1.67*scale)
+    pieces.extend([_cyl(p0, knee, .55*scale), _cyl(knee, p1, .55*scale),
+                   _cyl((knee[0], y-.67, knee[2]), (knee[0], y+.67, knee[2]), .64*scale)])
+    pieces.extend(_door(front, sign))
+    # At the crossing of hinge pins and oleo links a simultaneous N-way
+    # boolean can leave coincident trims. Weld the main unit progressively.
+    shape = pieces[0]
+    if front:
+        shape = _union(pieces)
+    else:
+        for component in pieces[1:]:
+            shape = shape.fuse(component).removeSplitter()
     label = 'Носовая опора' if front else ('Левая основная опора' if sign < 0 else 'Правая основная опора')
     return dict(id='GearFront' if front else ('BogiePort' if sign < 0 else 'BogieStarboard'),
-                label=label, group=GROUP, shape=_single_solid(_union(pieces)), color='#828c89',
+                label=label, group=GROUP, shape=_single_solid(shape), color='#828c89',
                 paint=partial(_gear_paint,front=front,sign=sign),
                 explode=(0, 0 if front else sign*9, -16),
                 orientation=(151 if sign > 0 or front else -151, 17, 0),
@@ -282,24 +326,33 @@ def _plinth_paint(x,y,z):
 
 
 def _plinth():
+    from plinth import hollow_deck
+
     small = _small_foot()
-    base = _loft([(-28.4,small),(-27.15,small),(-26.72,_OUTER),
-                  (_RAIL_Z,_OUTER),(DECK,_TOP)])
+    foot_z = -28.4
+    exterior = _loft([(foot_z, small), (-27.15, small), (-26.72, _OUTER),
+                      (_RAIL_Z, _OUTER), (DECK, _TOP)])
+    stations = [(54, 0, 11.4, 9.8), (169, -22, 15.6, 12.45), (169, 22, 15.6, 12.45)]
+    base = hollow_deck(exterior, _TOP, foot_z, DECK, [(x, y) for x, y, _, _ in stations])
     pieces, holes = [base], []
-    for x, y, length, width in [(54,0,12,12.5),(169,-22,15.5,15.0),(169,22,15.5,15.0)]:
-        bottom = _rect(x,y,length+.86,width+.86,1.09)
-        rim = _rect(x,y,length,width,.82)
-        pieces.append(_loft([(DECK-.12,bottom), (DECK+.40,bottom),
-                             (GROUND-.34,rim),(GROUND,rim)]))
-        holes.append(_pin(x,y,.20))
+    for x, y, length, width in stations:
+        # 4510: the tyre flats and jack rest on a simple thin rectangular slab,
+        # not a broad bevelled trophy boss. Retain both the rail and wheel levels.
+        foot = _rect(x, y, length-.74, width-.74, .28)
+        rim = _rect(x, y, length, width, .33)
+        pieces.extend([_slab(foot, DECK-.08, GROUND-.85),
+                       _slab(rim, GROUND-1.00, GROUND)])
+        keyhole = _rect(x, y, 3.50, 2.85, .40)
+        holes.append(_slab(keyhole, foot_z-.5, GROUND+.2))
     pieces.extend(_inscription())
     shape = _union(pieces).cut(Part.makeCompound(holes)).removeSplitter()
-    return dict(id='Plinth',label='Стилобат с тремя цоколями',group=GROUP,shape=_single_solid(shape),
-                color='#49595e',paint=_plinth_paint,explode=(0,0,-33),orientation=(8,59,0),
-                note='Печатать отдельно, с рафтом и опорами по нижней плоскости и вдоль нижнего ребра. '
-                     'Лицевую фаску с рельефом и верх цоколей оставлять без контактов. '
-                     'Открытые сверху карманы промыть пипеткой; не заполнять краской. '
-                     'Вначале вставить стойки в корпус, затем посадить сразу три нижних ключа в цоколи.')
+    return dict(id='Plinth', label='Полый стилобат с тремя цоколями', group=GROUP,
+                shape=_single_solid(shape), color='#49595e', paint=_plinth_paint,
+                explode=(0,0,-33), orientation=(8,59,0),
+                note='Печатать с рафтом под наклоном. Поддержки ставить на нижнюю кромку и снизу под рёбра; '
+                     'не перекрывать открытый низ и сквозные гнёзда. Не ставить контакты на рельеф и площадки шин. '
+                     'Промыть рёбра с нижней стороны и пролить каждое гнездо насквозь до установки стоек. '
+                     'Вначале вставить стойки в корпус, затем посадить три нижних ключа в цоколи.')
 
 
 def build():

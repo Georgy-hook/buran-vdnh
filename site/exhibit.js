@@ -13,7 +13,12 @@
   const poster = byId('poster');
   const parts = new Map();
   const scripts = new Map();
-  const state = { selected: null, isolated: false, exploded: false };
+  const state = { selected: null, isolated: false, exploded: false, underside: false };
+  const sliders = [
+    { control: 'bay', prefix: 'bay', initial: 0 },
+    { control: 'brakeUpper', prefix: 'brake-upper', initial: 100 },
+    { control: 'brakeLower', prefix: 'brake-lower', initial: 100 },
+  ];
   const format = new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 2 });
   let viewer = null;
   let loading = false;
@@ -62,8 +67,13 @@
 
   function render() {
     const item = parts.get(state.selected);
-    byId('assembled').setAttribute('aria-pressed', String(!state.exploded));
+    byId('assembled').setAttribute('aria-pressed', String(!state.exploded && !state.underside));
     byId('exploded').setAttribute('aria-pressed', String(state.exploded));
+    byId('underside').setAttribute('aria-pressed', String(state.underside));
+    for (const slider of sliders) {
+      const input = byId(`${slider.prefix}-opening`);
+      input.disabled = !!(state.isolated && !slider.parts?.includes(state.selected));
+    }
     byId('part-card').hidden = !item;
     select.value = item?.id || '';
     if (!item) return;
@@ -82,6 +92,10 @@
   }
 
   function choose(id, source) {
+    if (state.underside && viewer?.isSupport(id)) {
+      state.underside = false;
+      viewer.inspectBottom(false);
+    }
     state.selected = parts.has(id) ? id : null;
     if (!state.selected) state.isolated = false;
     viewer?.select(state.selected, state.isolated);
@@ -91,6 +105,11 @@
   }
 
   function mode(exploded) {
+    if (state.underside) {
+      state.underside = false;
+      viewer.inspectBottom(false);
+      viewer.select(state.selected, false);
+    }
     if (state.isolated) {
       state.isolated = false;
       viewer?.select(state.selected, false);
@@ -104,12 +123,18 @@
     state.selected = null;
     state.exploded = false;
     state.isolated = false;
+    state.underside = false;
+    for (const slider of sliders) {
+      byId(`${slider.prefix}-opening`).value = slider.initial;
+      showOpening(slider);
+    }
     viewer?.reset();
     render();
     byId('notice').textContent = 'Восстановлен общий вид собранной модели.';
   }
 
   function showScene(active) {
+    byId('instrument').classList.toggle('is-active', active);
     canvas.hidden = !active;
     poster.hidden = active;
     tools.hidden = !active;
@@ -123,7 +148,8 @@
     showScene(false);
     // Keep the catalogue, individual STL links and dimensions available without WebGL.
     if (parts.size) controls.hidden = false;
-    for (const id of ['isolate', 'assembled', 'exploded']) byId(id).disabled = true;
+    for (const id of ['isolate', 'assembled', 'exploded', 'underside']) byId(id).disabled = true;
+    byId('mechanisms').hidden = true;
     byId('gesture').hidden = true;
     error.textContent = message;
     error.hidden = false;
@@ -153,7 +179,46 @@
     return scripts.get(src);
   }
 
+  function showOpening(slider) {
+    const input = byId(`${slider.prefix}-opening`);
+    const percent = input.valueAsNumber;
+    const bay = slider.control === 'bay';
+    const text = percent === 0 ? (bay ? 'Закрыт' : 'Сомкнута') :
+      percent === 100 ? (bay ? 'Открыт' : 'Открыта') : `${percent} %`;
+    byId(`${slider.prefix}-reading`).textContent = text;
+    input.setAttribute('aria-valuetext', text);
+  }
+  function enableMechanisms() {
+    for (const slider of sliders) {
+      slider.parts = window.BURAN.parts.filter(({ articulation, id }) => {
+        if (slider.control === 'bay') return articulation?.family === 'bay';
+        return articulation?.family === 'brake' && id.endsWith(slider.control === 'brakeUpper' ? 'Upper' : 'Lower');
+      }).map(({ id }) => id);
+      byId(`${slider.prefix}-opening`).parentElement.hidden = !slider.parts.length;
+      showOpening(slider);
+    }
+    byId('mechanisms').hidden = !sliders.some((slider) => slider.parts.length);
+  }
+  for (const slider of sliders) {
+    const input = byId(`${slider.prefix}-opening`);
+    input.addEventListener('input', () => {
+      viewer?.setOpening(slider.control, input.valueAsNumber / 100);
+      showOpening(slider);
+    });
+  }
   select.addEventListener('change', () => choose(select.value, 'list'));
+  byId('underside').addEventListener('click', () => {
+    if (!viewer) return;
+    state.underside = !state.underside;
+    state.exploded = false;
+    state.isolated = false;
+    state.selected = null;
+    viewer.inspectBottom(state.underside);
+    render();
+    byId('notice').textContent = state.underside
+      ? 'Вид снизу: подставка и три съёмные опоры скрыты.'
+      : 'Подставка и опоры показаны.';
+  });
   byId('isolate').addEventListener('click', () => {
     if (!viewer || !state.selected) return;
     state.isolated = !state.isolated;
@@ -201,7 +266,8 @@
           sceneError(message);
         },
       });
-      for (const id of ['isolate', 'assembled', 'exploded']) byId(id).disabled = false;
+      for (const id of ['isolate', 'assembled', 'exploded', 'underside']) byId(id).disabled = false;
+      enableMechanisms();
       byId('gesture').hidden = false;
       viewer.select(state.selected, state.isolated);
       render();
