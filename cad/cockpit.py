@@ -8,22 +8,54 @@ exterior interpretation of the museum exhibit at 1:144, not production data.
 import Part
 import numpy as np
 
-from sections import FRAME, V, bezier
+from sections import FRAME, V, bezier, poly
 
 # XY outlines on the starboard brow, starting at the inboard sill corner.
 # Each quadrilateral is fitted to one plane on the curved skin below.
 LIGHTS = (
-    # White centre post grows towards the roof (Moscow 2026-03-31 23).
-    ((34.15, 1.04), (35.49, 10.19), (44.75, 7.82), (44.10, 2.65)),
-    ((35.84, 10.51), (42.25, 15.93), (48.84, 11.45), (45.04, 8.17)),
+    # The sill climbs to the front/quarter joint, then drops to the side light.
+    # The VDNKh right-quarter views and the March 2026 close-up show this fold.
+    ((34.15, 1.04), (37.89, 8.99), (44.75, 7.82), (44.10, 2.65)),
+    ((38.24, 9.31), (42.25, 15.93), (48.84, 11.45), (45.04, 8.17)),
     ((42.66, 16.21), (51.64, 17.15), (54.15, 12.78), (49.20, 11.82)),
 )
 FRAME_WIDTH = .36
 GLASS_DEPTH = .26
+BRIDGE_HALF_WIDTH = .54
+BRIDGE_RECESS = .09
 
 
 def _unit(v):
     return v * (1. / v.Length)
+
+
+def _bridges():
+    # Only the two interior joints on each cheek share a dark mounting strip.
+    # The gap between the left and right windscreens stays white.
+    for fore, aft in zip(LIGHTS, LIGHTS[1:]):
+        bottom = (V(*fore[1], 0.) + V(*aft[0], 0.)) * .5
+        top = (V(*fore[2], 0.) + V(*aft[3], 0.)) * .5
+        along = _unit(top - bottom)
+        across = V(-along.y, along.x, 0.)
+        yield bottom - .12*along, along, across, (top-bottom).Length + .24
+
+
+BRIDGES = tuple(_bridges())
+
+
+def _bridge_cuts(blank):
+    # A shallow paint land follows the actual curved crown. It gives the STL
+    # a tangible boundary without a separate strip to glue or a trapped void.
+    below = blank.copy()
+    below.translate(V(0., 0., -BRIDGE_RECESS))
+    for start, along, across, length in BRIDGES:
+        end = start + length*along
+        half = BRIDGE_HALF_WIDTH*across
+        for side in (-1, 1):
+            corners = [V(p.x, side*p.y, 28.) for p in
+                       (start-half, start+half, end+half, end-half)]
+            column = Part.Face(poly(corners)).extrude(V(0., 0., 16.))
+            yield column.cut(below)
 
 
 def _crown(blank, x, y):
@@ -99,6 +131,7 @@ def cockpit(blank):
             tool, pane = _pane(blank, [(x, y*side) for x, y in footprint], sill)
             cutters.append(tool)
             panes.append(pane)
+    cutters.extend(_bridge_cuts(blank))
     return cutters, panes
 
 
@@ -108,13 +141,24 @@ def glazing_color(panes, p):
             continue
         distance = (p-origin).dot(n)
         on_glass = abs(distance + GLASS_DEPTH) < .012
-        if distance < -GLASS_DEPTH-.012 or distance > .012:
+        if distance < -GLASS_DEPTH-.012 or distance > 2.:
             continue
-        if all((p-a).dot(to_inside) > -.03 for a, to_inside in edges):
+        inset = min((p-a).dot(to_inside) for a, to_inside in edges)
+        if inset > -.025:
+            if distance > .012:
+                if inset < .085:
+                    return FRAME  # The exposed wall of the blind pocket.
+                continue
             if on_glass:
                 return '#292e36'  # Opaque, near-neutral museum covers, not blue glass.
             if distance < -.012:
                 return FRAME  # The inner wall is the gasket, not white porcelain.
             sill_distance = (p - edges[0][0]).dot(edges[0][1])
             return '#697073' if sill_distance < sill - .32 else FRAME
+    if 29.5 < p.z < 39.3:
+        crown = V(p.x, abs(p.y), 0.)
+        for start, along, across, length in BRIDGES:
+            d = crown - start
+            if -.015 < d.dot(along) < length+.015 and abs(d.dot(across)) < BRIDGE_HALF_WIDTH+.015:
+                return FRAME
     return None
