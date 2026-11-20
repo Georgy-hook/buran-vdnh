@@ -1,0 +1,37 @@
+name: Publish Buran exhibit
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: github-pages
+  cancel-in-progress: true
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Check downloadable kit and offline scene
+        run: |
+          set -eu
+          test -s site/index.html
+          test -s site/assets/model-data.js
+          test -s site/files/Buran-VDNH.FCStd
+          unzip -tq site/files/Buran-STL.zip
+          test "$(find site/files/stl -type f -name '*.stl' | wc -l)" -eq 14
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: site
+      - id: deployment
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1

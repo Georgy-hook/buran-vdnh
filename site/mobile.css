@@ -1,0 +1,265 @@
+@media (pointer: coarse) {
+  .gesture .pointer-copy {
+    display: none;
+  }
+  .gesture .touch-copy {
+    display: inline;
+  }
+}
+@media (max-width: 900px) {
+  .mast-caption {
+    display: none;
+  }
+  .standfirst {
+    max-width: 295px;
+  }
+  .passport-layout,
+  .resource-layout {
+    gap: 30px;
+  }
+  .measure {
+    padding: 18px;
+  }
+  .measure dl > div {
+    flex-wrap: wrap;
+  }
+  .part-card {
+    align-items: start;
+  }
+  .part-actions {
+    justify-content: end;
+  }
+  .download {
+    padding: 16px;
+  }
+}
+@media (max-width: 680px) {
+  .shell {
+    width: calc(100% - 34px);
+  }
+  .mast-inner {
+    min-height: 54px;
+    gap: 8px;
+  }
+  .identity {
+    font-size: 18px;
+    gap: 5px;
+  }
+  .emblem {
+    width: 29px;
+  }
+  .mast nav {
+    gap: 15px;
+    font-size: 13px;
+  }
+  .mast nav a:first-child {
+    display: none;
+  }
+  .nav-files {
+    gap: 4px;
+  }
+  .intro {
+    display: block;
+    padding-block: 25px 19px;
+  }
+  .kicker,
+  .stage-id,
+  .stage-scale {
+    font-size: 10px;
+  }
+  h1 {
+    font-size: clamp(61px, 14vw, 88px);
+    margin-top: 8px;
+  }
+  .designation {
+    font-size: 12px;
+    padding: 5px 7px;
+  }
+  .standfirst {
+    max-width: 44ch;
+    margin: 10px 0 0;
+    font-size: 15px;
+  }
+  .stage {
+    height: clamp(275px, min(80vw, 44svh), 380px);
+  }
+  .stage-id {
+    left: 12px;
+    top: 13px;
+    gap: 7px;
+  }
+  .stage-scale {
+    right: 12px;
+    top: 13px;
+  }
+  .ruler {
+    width: 4px;
+  }
+  .ruler::before {
+    right: -3px;
+  }
+  .register-mark {
+    right: 6px;
+    width: 7px;
+    height: 7px;
+  }
+  .stage-bottom {
+    left: 10px;
+    right: 8px;
+    bottom: 8px;
+    gap: 7px;
+  }
+  .gesture {
+    max-width: 165px;
+    font-size: 10px;
+    line-height: 1.35;
+    gap: 6px;
+  }
+  .gesture .icon {
+    width: 17px;
+  }
+  .camera-tools button {
+    width: 39px;
+  }
+  .controls {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 7px;
+    padding: 8px;
+  }
+  .modes {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+  .modes button {
+    border: 1px solid #c1c3b7;
+  }
+  .part-picker {
+    gap: 9px;
+  }
+  .part-picker label {
+    padding-left: 6px;
+  }
+  .part-picker select {
+    flex: 1;
+    width: 100px;
+  }
+  .part-card {
+    display: block;
+    padding: 15px;
+  }
+  .part-actions {
+    justify-content: start;
+    margin-top: 10px;
+  }
+  .action {
+    font-size: 13px;
+    padding-inline: 10px;
+  }
+  .part-size {
+    font-size: 11px;
+  }
+  .plate-caption {
+    margin-top: 8px;
+    font-size: 11px;
+  }
+  .plate-caption a {
+    display: none;
+  }
+  .section-block,
+  .workshop {
+    padding-block: 42px;
+  }
+  .section-sign {
+    margin-bottom: 24px;
+  }
+  .passport-layout,
+  .resource-layout,
+  .guide,
+  .downloads {
+    grid-template-columns: 1fr;
+  }
+  .passport-layout,
+  .resource-layout {
+    gap: 24px;
+  }
+  .passport-layout article p {
+    margin-top: 14px;
+  }
+  .measure dl > div {
+    flex-wrap: nowrap;
+  }
+  .workshop-head {
+    display: block;
+  }
+  .workshop-head > p {
+    margin-top: 13px;
+  }
+  .downloads {
+    margin: 20px 0 28px;
+    gap: 8px;
+  }
+  .download {
+    min-height: 80px;
+    gap: 12px;
+  }
+  .file-tag {
+    flex-basis: 46px;
+  }
+  .download strong {
+    font-size: 18px;
+  }
+  .guide {
+    gap: 22px;
+  }
+  .guide h3 {
+    margin-top: 12px;
+  }
+  .resource-layout > div p {
+    max-width: 45ch;
+    margin: 10px 0 0;
+  }
+  .sequence {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  .references a {
+    gap: 12px;
+  }
+  .footer {
+    flex-wrap: wrap;
+    row-gap: 3px;
+  }
+  .footer > span:nth-child(2) {
+    width: 100%;
+    order: 1;
+  }
+}
+@media (max-width: 370px) {
+  .mast nav a:not(.nav-files) {
+    display: none;
+  }
+  .shell {
+    width: calc(100% - 24px);
+  }
+  .kicker {
+    gap: 7px;
+  }
+  .gesture {
+    max-width: 117px;
+  }
+  .measure dl > div {
+    flex-wrap: wrap;
+  }
+}
+@media (max-height: 540px) and (orientation: landscape) {
+  .intro {
+    padding-block: 10px 12px;
+  }
+  h1 {
+    font-size: 52px;
+  }
+  .stage {
+    height: clamp(238px, 63svh, 340px);
+  }
+}
