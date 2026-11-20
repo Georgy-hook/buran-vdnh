@@ -6,20 +6,27 @@ All the circles and stripes are blind surface impressions, not working openings.
 
 import Part
 
-from sections import V, cut, poly
+from sections import V, box, cut, poly
 
 
 STATIONS = [
     # x, outboard face Y, lower inside edge, lower outer edge, crown
-    (198.1, 19.30, 26.25, 27.05, 28.62),
-    (201.0, 20.25, 25.84, 26.63, 29.84),
-    (207.6, 22.45, 24.63, 25.90, 31.53),
-    (214.4, 24.52, 23.54, 25.18, 32.90),
-    (217.0, 24.75, 23.50, 25.14, 33.18),
-    (233.2, 24.75, 23.80, 25.34, 33.32),
-    (234.6, 24.48, 24.15, 25.62, 32.92),
+    (197.7, 19.32, 26.18, 26.75, 28.66),
+    (201.0, 20.25, 25.54, 26.28, 29.86),
+    (207.6, 22.45, 23.72, 25.47, 31.98),
+    (213.4, 24.30, 22.72, 25.04, 33.43),
+    (217.0, 25.72, 21.90, 24.82, 34.35),
+    (219.5, 26.54, 21.62, 24.78, 34.56),
+    (239.8, 26.54, 21.62, 24.78, 34.56),
+    (241.2, 26.38, 21.84, 24.98, 34.30),
 ]
-SIDE_MARKS = (217.65, 222.15, 226.65, 231.15)
+SIDE_MARKS = (221.40, 227.15, 232.90, 238.65)
+END_MARKS = ((22.44, 26.47), (20.72, 30.99))
+
+
+def _underside(y):
+    # Inclined face below the last box, as seen from below on Popov 4548.
+    return 21.70+(abs(y)-19.03)*.421
 
 
 def relief_cup(centre, direction, radius, depth):
@@ -31,19 +38,36 @@ def relief_cup(centre, direction, radius, depth):
 
 def shoulder(side):
     def section(x, y, bottom, chine, top):
-        points = [(17.45,bottom), (20.30 if y>21 else 18.10,bottom+.06),
-                  (y-.30,chine-.16), (y,chine+.22), (y,top-.54),
-                  (y-.21,top-.18), (y-.59,top), (17.45,top-.10)]
+        inboard = 17.38 if x<228. else 17.38+min(1.55,(x-228.)*.17)
+        skew = min(1., max(0., (x-218.)/19.0))
+        foot = inboard+1.21*skew
+        head = inboard-1.94*skew
+        knee = min(y-.70, foot+1.58)
+        points = [(foot,bottom), (knee,bottom+.08),
+                  (y-.30,chine-.17), (y,chine+.20), (y,top-.58),
+                  (y-.21-.57*skew,top-.18), (y-.64-1.30*skew,top), (head,top-.12)]
         return poly([V(x,side*a,b) for a,b in points])
 
     body = Part.makeLoft([section(*s) for s in STATIONS], True, True)
-    marks = [relief_cup(V(x,side*25.03,29.60), V(0,-side,0), 1.23, .93)
+    marks = [relief_cup(V(x,side*26.79,29.62), V(0,-side,0), 1.59, 1.96)
              for x in SIDE_MARKS]
-    marks.extend(relief_cup(V(234.93,side*y,z), V(-1,0,0), .91,.92)
-                 for y,z in ((21.42,27.25),(21.96,30.19)))
-    # A separate dark bevel can be seen from below. Keep it joined to the solid.
-    marks.extend(relief_cup(V(x,side*22.65,23.68), V(0,-side*.28,.96), .94, 1.13)
-                 for x in SIDE_MARKS)
+    marks.extend(relief_cup(V(241.40,side*y,z), V(-1,0,0), 1.30,1.47)
+                 for y,z in END_MARKS)
+    # A row on the inclined plate is distinct from the horizontal side row.
+    inward = V(0,-side*.388,.922)
+    marks.extend(relief_cup(V(x,side*22.70,_underside(22.70))-inward*.61,
+                            inward, 1.24, 1.70) for x in SIDE_MARKS)
+    # Panel seams continue over the cap and around the corners; the front
+    # wedge and the louvre stay unbroken. Dismantling photo, July 2014.
+    for x in (219.87,225.0,230.12,235.74,240.58):
+        marks.append(box(x-.085, -27.2 if side<0 else 18.7,
+                         34.28, .17, 8.50, 1.10))
+    start_y = 26.33 if side>0 else -27.1
+    for x in (219.9,224.26,230.02,235.76):
+        marks.append(box(x-.085,start_y,25.12,.17,.77,8.97))
+    # The rear opening is a two-piece angled cheek, not a flat rectangle.
+    marks.append(box(240.98, 21.55 if side>0 else -26.65,
+                     28.38, .66, 5.1, .18))
     # Perituss (_26, VDNKh): a framed five-blade vent, and a large flush
     # circular field farther aft on the sloping cheek. Not a row of engines.
     def plane_y(x):
@@ -68,14 +92,19 @@ def shoulder(side):
 
 def color(x,y,z):
     v = abs(y)
-    if x > 216.1 and v > 20.5:
-        if 23.45 < z < 25.50 and x < 234.72:
-            return '#43484c'
-        if v > 23.2 and 27.8 < z < 31.25:
-            if any((x-u)**2+(z-29.60)**2 < 1.25**2 for u in SIDE_MARKS):
-                return '#2c3033'
-        if x > 233.46 and any((v-a)**2+(z-b)**2 < .96**2 for a,b in ((21.42,27.25),(21.96,30.19))):
-            return '#2c3033'
+    if x >= 216.4 and v > 18.75:
+        if x > 239.57 and any((v-a)**2+(z-b)**2 < 1.53**2 for a,b in END_MARKS):
+            return '#2d3032'
+        if v>24.46 and any((x-u)**2+(z-29.62)**2 < 1.80**2 for u in SIDE_MARKS):
+            return '#262b2d' if v<25.24 else '#494c4e'
+        if z < _underside(v)+.60:
+            return '#4d5253'
+        if z < _underside(v)+1.75 and any(abs(x-u)<1.43 for u in SIDE_MARKS) and 20.7<v<24.1:
+            return '#272c2f'
+        if 24.95 < z < 34.32 and v > 26.25 and v < 26.39:
+            return '#abaea8'
+        if 34.22 < z < 34.37 and v<25.75 and x>220.:
+            return '#b0b2ac'
     if 202.42 < x < 207.25 and v > 20.20:
         if any(a-.015 < z < a+.255 for a in (26.70,27.18,27.66,28.14,28.62)):
             return '#565c60'

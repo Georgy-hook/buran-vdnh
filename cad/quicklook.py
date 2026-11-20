@@ -15,7 +15,7 @@ def export(scene, parts, path):
 
     # The native viewer is Y-up, metres. Re-centre the stand on the table but
     # never fit the model to a generic 1 m box: its 1:144 scale is the point.
-    bounds = [part['shape'].BoundBox for part in parts]
+    bounds = [part['shape'].optimalBoundingBox(False) for part in parts]
     mid_x = .5 * (min(b.XMin for b in bounds) + max(b.XMax for b in bounds))
     mid_y = .5 * (min(b.YMin for b in bounds) + max(b.YMax for b in bounds))
     low_z = min(b.ZMin for b in bounds)

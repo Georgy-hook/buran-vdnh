@@ -136,9 +136,9 @@ def panel_tools(x0, x1):
             for x in (169.76, 170.19, 181.36, 181.79, 193.42, 193.85):
                 for z in (27.04, 27.32):
                     tools.append(Part.makeCylinder(.088, .39, V(x,side*20.20,z), V(0,-side,0)))
-        # Rounded cover with a circular centre, aft of the word and flag;
-        # a second round cover is captured on both sides in 4508 and 4548.
-        for xc, zc, r in ((222.5,16.5,.92),(212.0,19.8,1.18),(199.8,22.6,.85)):
+        # Two flush round covers on the bare flank. The third, on the
+        # raised aft inspection lid, is scored into that lid in sidewall.py.
+        for xc, zc, r in ((212.0,19.8,1.18),(199.8,22.6,.85)):
             for side in (-1, 1):
                 axis = V(0,-side,0)
                 ctr = V(xc,side*20.30,zc)

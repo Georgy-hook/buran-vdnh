@@ -10,6 +10,7 @@ import sys
 import FreeCAD as App
 import MeshPart
 
+from belly import TILE_FINISHES
 from native import save_native
 
 __all__ = ['make_glb', 'save_native']
@@ -35,7 +36,7 @@ def finish(color):
         return .08, .35  # smooth dark tip, contrasting subtly with the matte tiles
     if color in ('#626b70', '#a4aeac', '#828c89', '#606769', '#697073'):
         return .50, .46  # metal surrounds, oleos and gear hardware
-    if color in ('#232a2b', '#343b3e', '#2c3033', '#43484c', '#292d30',
+    if color in TILE_FINISHES or color in ('#5a605f', '#626766', '#656967', '#232a2b', '#343b3e', '#2c3033', '#43484c', '#292d30',
                  '#323539', '#32383d', '#475057', '#383b3c'):
         return .0, .88  # tyre rubber and dark external thermal surfaces
     if color in ('#242f34', '#37474e', '#49595e'):

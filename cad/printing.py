@@ -108,7 +108,7 @@ JOINTS = set(frozenset(i.split('/')) for i in [
     'Nose/Bay','Bay/Aft','Aft/Stern','Stern/LowerFlap','Bay/WingPort','Bay/WingStarboard',
     'Aft/WingPort','Aft/WingStarboard','Aft/Fin','Nose/GearFront','Aft/BogiePort','Aft/BogieStarboard',
     'GearFront/Plinth','BogiePort/Plinth','BogieStarboard/Plinth',
-    'Bay/BayDoorPort','Bay/BayDoorStarboard',
+    'Bay/BayDoorPort','Bay/BayDoorStarboard','Aft/BayDoorPort','Aft/BayDoorStarboard',
     'Fin/BrakePortLower','Fin/BrakePortUpper','Fin/BrakeStarboardLower','Fin/BrakeStarboardUpper',
 ])
 
@@ -122,7 +122,7 @@ _SEATS = {
     frozenset(('Bay', 'Aft')): (160., 1.4, 1.62),
     frozenset(('Aft', 'Stern')): (232., 1.4, 1.62),
     frozenset(('Stern', 'LowerFlap')): (235.2, .7, 3.8),
-    frozenset(('Aft', 'Fin')): (192.4, 1.18, 40.),
+    frozenset(('Aft', 'Fin')): (214., 1.2, 40.),
     frozenset(('Nose', 'GearFront')): (57.3, .58, 5.8),
 }
 for _hand, _side in [('Port', -1), ('Starboard', 1)]:
@@ -130,6 +130,7 @@ for _hand, _side in [('Port', -1), ('Starboard', 1)]:
     _SEATS[frozenset(('Aft', 'Wing'+_hand))] = (164.2, 20.*_side, 7.12)
     _SEATS[frozenset(('Aft', 'Bogie'+_hand))] = (174.4, 12.7*_side, 5.8)
     _SEATS[frozenset(('Bay', 'BayDoor'+_hand))] = (76.9, 1.2*_side, 37.9)
+    _SEATS[frozenset(('Aft', 'BayDoor'+_hand))] = (186.3, 1.2*_side, 37.9)
 
 
 def seating_distance(a, b, ids):

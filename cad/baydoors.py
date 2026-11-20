@@ -6,17 +6,16 @@ another long sill line and isolated fittings, not a tile grid. The bearings,
 travel stops and unladen bay lining are model engineering, not flight hardware.
 """
 
+from bisect import bisect_left
 import math
 
-import FreeCAD as App
+from FreeCAD import Vector as V
 import Part
 
-from bay_liner import fixed_operations, roof_members
-from sections import PORCELAIN, V, box, cut, fuse, inset, item, mid, shell_blank
+from bay_liner import FRONT, REAR, FRAMES, STRAPS, fixed_operations, roof_members
+from sections import PORCELAIN, box, cut, fuse, inset, item, mid, shell_blank
 
 
-# Both fixed collars belong to Bay; no feature straddles either hull joint.
-FRONT, REAR = 76.2, 155.8
 EDGE_GAP = .30
 HALF_CENTRE_GAP = .22
 SILL = 26.44
@@ -62,32 +61,37 @@ def _mouth(s, x0, x1, half_height):
 
 def operations(x0, x1):
     """For Work.apply AFTER the skin details, BEFORE cutting assembly sockets."""
-    if (x0, x1) != (72, 160):
+    if x1 <= FRONT-3.57 or x0 >= REAR+3.57:
         return []
 
-    left, right = FRONT - EDGE_GAP, REAR + EDGE_GAP
-    rim_cut = box(left, -27, SILL, right - left, 54, 24)
+    left, right = max(x0, FRONT - EDGE_GAP), min(x1, REAR + EDGE_GAP)
+    opening = [box(left, -27, SILL, right-left, 54, 24)] if right > left else []
+
+    def local(t0, t1):
+        return [(max(a, x0), min(b, x1)) for a, b in _ends(t0, t1)
+                if a < x1 and b > x0]
+
     bosses, pockets = [], []
     for s in (-1, 1):
-        for a, b in _ends(-3.57, -.31):
+        for a, b in local(-3.57, -.31):
             blank = _cylinder(s, a, b, 2.55)
             # Flush-ended cheek, only 1.5 mm proud of the original side.
             bosses.append(blank.common(box(a - .1, -21.50, 20, b-a+.2, 43, 16)))
-        for a, b in _ends(-3.48, 2.33):
+        for a, b in local(-3.48, 2.33):
             pockets.append(_cylinder(s, a, b, R_BORE))
-        for a, b in _ends(-3.48, -1.52):
+        for a, b in local(-3.48, -1.52):
             pockets.append(_mouth(s, a, b, MOUTH_HALF))
-        for a, b in _ends(-1.52, 2.33):
+        for a, b in local(-1.52, 2.33):
             pockets.append(_mouth(s, a, b, R_BORE))
-        for a, b in _ends(-1.53, .18):
+        for a, b in local(-1.53, .18):
             pockets.append(_sector(s, a, b, R_CAM + .24, CAM_FROM - OPEN, CAM_TO))
 
-    # Pads under the near-flat crown. No diaphragm, sealed tank or fictitious cargo.
-    pads = [box(a, -2.3, 36.9, b-a, 4.6, 1.0) for a, b in _ends(-.9, 1.65)]
-    return [('cut', 'Грузовой отсек · сквозное раскрытие до промывочного канала', [rim_cut]),
+    # Separate crown seats, independent of the wash-through end screens.
+    pads = [box(a, -2.3, 36.9, b-a, 4.6, 1.0) for a, b in local(-.9, 1.65)]
+    return [('cut', 'Грузовой отсек · сквозное раскрытие до промывочного канала', opening),
             ('add', 'Створки · торцевые щёки и опоры закрытого свода', bosses + pads),
             ('cut', 'Поворотные цапфы · замочные щели и секторные ограничители', pockets),
-            *fixed_operations()]
+            *fixed_operations(x0, x1)]
 
 
 def _shape(s):
@@ -106,12 +110,18 @@ def _shape(s):
     limiter = trunk(FRONT - .2, REAR + .2, .24, .24)
     tools = [box(FRONT - .1, -24, 30.70, REAR - FRONT + .2, 48, .25).cut(limiter)]
     straps = []
-    for x in (98.8, 121.5, 145.):
+    for x in STRAPS:
         tools.append(box(x, -25, 30.7, .32, 50, 13).cut(limiter))
         # Thin doubler from the secondary shoulder line over the crown.
         stock = trunk(x-.80, x-.12, -.12, -.13)
         patch = stock.cut(inner).common(half).common(box(x-1, -25, 31.0, 1.2, 50, 12))
         straps.append(patch)
+    # Lower rolled seam, independent of the crown straps; its shallow second
+    # tier and discrete hinge keepers are visible above the VDNKh wordmark.
+    tools.append(box(FRONT-.1, -25, 28.65, REAR-FRONT+.2, 50, .23).cut(limiter))
+    for x in (85.1, 103.5, 121.0, 139.2, 157.4, 171.0, 184.9):
+        y = 19.50 if s > 0 else -20.22
+        straps.append(box(x-.46, y, 28.68, .92, .72, 1.13))
     skin = cut(fuse(skin, straps), tools)
 
     metal = []
@@ -129,6 +139,45 @@ def _shape(s):
     return fuse(skin, metal + roof_members(s))
 
 
+# Approximated mid-thickness roof boundary for the face-palette classifier.
+# This is sampled once, not a boolean or nearest-face search per GLB triangle.
+def _roof_split():
+    w, bottom, crown = 18.90, 26.30, 38.95
+    rows = [(0., crown)]
+    for n in range(65):
+        t = 1 - n/64
+        u = 1-t
+        y = w*(u**3 + 3*u*u*t + 3*u*t*t*.56 + t**3*.15)
+        z = bottom + (crown-bottom)*(3*u*u*t*.67 + 3*u*t*t + t**3)
+        rows.append((y, z))
+    return rows
+
+
+_SPLIT = _roof_split()
+_WIDTHS = tuple(y for y, z in _SPLIT)
+
+
+def door_color(x, y, z):
+    w = abs(y)
+    if x < FRONT or x > REAR:
+        return '#899396'
+    if w > 20.04 and 28.60 < z < 29.87:
+        return '#a6aaa4'
+    i = max(1, bisect_left(_WIDTHS, w))
+    if i < len(_SPLIT):
+        a, h = _SPLIT[i-1]
+        b, k = _SPLIT[i]
+        if z < h + (k-h)*(w-a)/(b-a):
+            if any(abs(x-f) < .36 for f in FRAMES):
+                return '#bbc3bd'
+            if any(lo-.02 < w < lo+.54 for lo in (3.25,6.1,8.9,11.7,14.2,16.15)):
+                return '#acb6b2'
+            return '#909e9e'
+    if any(f-.82 < x < f-.10 for f in STRAPS) and z > 30.98:
+        return '#d1d2ca'
+    return PORCELAIN
+
+
 def kit():
     parts = []
     for s, key, side in [(-1, 'BayDoorPort', 'левая'), (1, 'BayDoorStarboard', 'правая')]:
@@ -137,7 +186,7 @@ def kit():
                     'Опоры на внутреннюю стенку, не на цапфы. Не красить щели. '
                     'Удерживая створку открытой на 57°, одновременно ввести обе '
                     'цапфы снаружи в торцевые пазы. Поворот до упора — 112°; '
-                    'снимать только при 57°, без отгибания щёк.')
+                    'снимать только при 57°, без отгибания щёк.', paint=door_color)
         part['articulation'] = dict(family='bay', axis=[1, 0, 0],
                                     pivot=[FRONT, s*PIVOT_Y, PIVOT_Z], angle=-s*OPEN)
         parts.append(part)

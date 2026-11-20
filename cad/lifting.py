@@ -10,18 +10,23 @@ from math import cos, radians, sqrt
 
 import Part
 from FreeCAD import Vector as V
+from fin_cheeks import score as fin_scores
 from sections import PORCELAIN
 from wing_relief import CARBON, paint as wing_paint, wing_skin
 
-# The portion of the swept hinge line visible in the nearly lateral photograph
-# runs from about (755,284) to (832,175) px. The fin stands 164 px above the
-# spine in that image. Z=40..97 is the corresponding kit dimension.
+# The scale of the profile comes from the height over the spine, NOT the
+# nose-to-tail apparent length in the ground photographs (perspective).
+# Commons 03 and 06 independently put the toe at the flag station and
+# the end of the brow beyond the end of the lateral fairing.
+AXLE_X = 217.2
 SLOPE = .70
 S = sqrt(1.+SLOPE**2)
 AXIS = V(SLOPE/S, 0, 1./S)
 CHORD = V(1./S, 0, -SLOPE/S)
 OPEN = 32.0
-AXLE_Y = 1.62
+# Extraction pockets must leave a continuous central septum: with axes
+# closer than twice the counterbore radius the sky shows through the fin.
+AXLE_Y = 2.09
 PIN = .78
 BORE = .98
 HUB = 1.44
@@ -29,26 +34,28 @@ SEAT = 2.75
 
 
 def pivot(sign):
-    return V(194.2, sign*AXLE_Y, 54.)
+    return V(AXLE_X, sign*AXLE_Y, 54.)
 
 
 def _hinge_x(z):
-    return 194.2+SLOPE*(z-54.)
+    return AXLE_X+SLOPE*(z-54.)
 
 
-# z, LE, aft edge of fixed fin, half thickness. Broad lower root carries
-# the same two assembly keys as before. The cap overhangs the movable leaves.
+# z, LE, aft edge of fixed fin, half thickness. The rising heel behind
+# the load-carrying shoe is not an extension of the roof. The brow and
+# the lower spur overhang the swept hinge line, independent of the leaves.
 FIN = (
-    (40.0, 167.8, 223.0, 4.30), (40.65, 167.87, 221.9, 3.91),
-    (42.2, 167.99, 216.6, 3.45), (44.0, 168.18, 208.55, 3.22),
-    (45.0, 168.37, 208.92, 3.12), (47.0, 168.69, 210.0, 2.99),
-    (47.85, 168.92, 208.85, 2.95), (49.0, 169.30, 201.4, 2.88),
-    (51.2, 170.54, _hinge_x(51.2)+1.73*S, 2.78),
-    (53.8, 172.70, _hinge_x(53.8)+1.73*S, 2.71),
-    (87.7, 203.43, _hinge_x(87.7)+1.73*S, 1.99),
-    (92.25, 207.55, _hinge_x(92.25)+1.73*S, 1.84),
-    (93.18, 208.47, 231.72, 1.72), (96.1, 212.05, 231.86, 1.55),
-    (96.75, 213.91, 231.86, 1.42), (97.0, 216.0, 231.85, 1.35),
+    (40.00, 192.00, 229.50, 5.65), (40.62, 192.10, 228.10, 5.05),
+    (41.65, 192.22, 226.45, 4.32), (44.10, 192.36, 234.60, 3.59),
+    (47.65, 192.85, 236.80, 3.25), (48.05, 192.98, 236.96, 3.20),
+    (48.60, 193.16, 235.75, 3.15), (49.75, 193.61, 221.60, 3.04),
+    (51.20, 194.42, _hinge_x(51.2)+1.73*S, 2.88),
+    (54.00, 196.80, _hinge_x(54.0)+1.73*S, 2.72),
+    (87.70, 226.99, _hinge_x(87.7)+1.73*S, 2.00),
+    (92.25, 231.12, _hinge_x(92.25)+1.73*S, 1.84),
+    (93.18, 232.06, 254.80, 1.72), (95.05, 233.94, 254.78, 1.55),
+    (96.10, 235.43, 254.73, 1.46), (96.78, 237.12, 254.62, 1.30),
+    (97.04, 239.12, 254.55, 1.09), (97.12, 240.85, 254.46, .89),
 )
 
 
@@ -100,7 +107,7 @@ def _key(x, width, thick, depth, embed, socket=False):
 
 
 def _fin_band(z, chord):
-    return min(.18*chord, 1.38+1.30*max(0., 1.-(z-40.)/9.)**2)
+    return min(.18*chord, 1.36+2.05*max(0., 1.-(z-40.)/11.)**2)
 
 
 def _fin_wire(z):
@@ -124,7 +131,12 @@ def _fin_paint(x, y, z):
     le, tail, _ = _interp(FIN, z)
     if x < le+_fin_band(z, tail-le) or z > 96.75:
         return CARBON
-    if z >= 93.18 and x >= tail-.80 or 44. < z < 49.6 and x > tail-1.1:
+    # Dark lower liners on the overhanging brow and on the swept heel;
+    # 2013 rear-quarter images show the light cheek ending above these.
+    if z >= 93.18 and (x >= tail-.80 or z < 94.05 and x > _hinge_x(z)+.8):
+        return CARBON
+    heel_edge = 222.0+3.25*(z-41.45)
+    if z < 51.2 and (x > tail-1.1 or 41.45 < z < 45.7 and x > heel_edge):
         return CARBON
     if 51.2 < z < 92.3 and x >= _hinge_x(z)-2.65:
         return CARBON
@@ -159,10 +171,17 @@ def _leaf_local(end, fraction):
 def _layer(sign, segment, level, recess):
     low, high = LEVELS[segment]
     end = tuple(a+(b-a)*level for a,b in zip(low, high))
-    fractions = (0., .085, .11, .877, .907, 1.)
-    widths = (.71, .79, .79-recess, .79-recess, .79, .48)
+    # Curved outside, flatter mating face. The broad forward spar tapers
+    # to a blunt printable trailing land; the perimeter stands proud of
+    # the light insert. Mirroring is local, not a negative-scale mesh.
+    fractions = (0., .042, .085, .115, .27, .57, .865, .902, .965, 1.)
+    outer = (.56, .84, 1.05, 1.06-recess, 1.14-recess,
+             .98-recess, .70-recess, .71, .55, .35)
+    inner = (.50, .66, .74, .76-recess, .80-recess,
+             .75-recess, .66-recess, .64, .52, .35)
     outline = []
-    for side, indices in ((1, range(6)), (-1, reversed(range(6)))):
+    for side, widths, indices in ((sign, outer, range(len(outer))),
+                                  (-sign, inner, reversed(range(len(inner))))):
         for i in indices:
             u, w = _leaf_local(end, fractions[i])
             outline.append(_local(sign, u, side*widths[i], w))
@@ -213,6 +232,10 @@ def _leaf_paint(sign, segment):
         level = (w-wl)/(wh-wl)
         rear = _leaf_local(tuple(a+(b-a)*level for a,b in zip(low, high)), 1.)[0]
         fraction = (u-FRONT)/(rear-FRONT)
+        # The inner faces seen from aft are light edge-to-edge; the thick
+        # black rectangular surrounds seen broadside are on the outside.
+        if p.y*sign < -.18 and fraction > .11 and .012 < level < .989:
+            return '#d9dad4'
         if level < .061 or level > .94 or fraction < .11 or fraction > .88:
             return CARBON
         return PORCELAIN
@@ -233,8 +256,9 @@ def _part(name, label, shape, explode, orientation, paint, note):
 def tail():
     def along_z(x, y, d):
         return V(x, y, 40.-d)
-    keys = [(184., 12.6, 3.35, 4.4), (215., 9.4, 2.35, 4.4)]
+    keys = [(204., 10.4, 3.4, 4.4), (222., 7.2, 2.5, 4.4)]
     fixed = _loft([_fin_wire(row[0]) for row in FIN])
+    fixed = fin_scores(fixed, lambda z: _interp(FIN, z)[0])
     # Counterbores include a 3.6 mm extraction stroke. Remove the open upper
     # leaf first, then the lower; reverse that order to assemble. In between
     # the bearings, the continuous dark fairing closes the hinge line.

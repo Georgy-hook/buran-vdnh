@@ -148,7 +148,7 @@
     showScene(false);
     // Keep the catalogue, individual STL links and dimensions available without WebGL.
     if (parts.size) controls.hidden = false;
-    for (const id of ['isolate', 'assembled', 'exploded', 'underside']) byId(id).disabled = true;
+    for (const id of ['isolate', 'assembled', 'exploded', 'underside', 'shot']) byId(id).disabled = true;
     byId('mechanisms').hidden = true;
     byId('gesture').hidden = true;
     error.textContent = message;
@@ -207,6 +207,25 @@
     });
   }
   select.addEventListener('change', () => choose(select.value, 'list'));
+  byId('shot').addEventListener('change', (event) => {
+    const menu = event.currentTarget;
+    const name = menu.value.slice(2);
+    const label = menu.selectedOptions[0]?.textContent;
+    if (!viewer?.setView(name)) return;
+    state.selected = null;
+    state.isolated = false;
+    state.exploded = false;
+    state.underside = name === 'underside';
+    for (const slider of sliders) {
+      byId(`${slider.prefix}-opening`).value =
+        slider.control === 'bay' && name === 'opened' ? 100 : slider.initial;
+      showOpening(slider);
+    }
+    menu.value = '';
+    render();
+    byId('notice').textContent = `Ракурс: ${label}.`;
+    canvas.focus({ preventScroll: true });
+  });
   byId('underside').addEventListener('click', () => {
     if (!viewer) return;
     state.underside = !state.underside;
@@ -266,7 +285,7 @@
           sceneError(message);
         },
       });
-      for (const id of ['isolate', 'assembled', 'exploded', 'underside']) byId(id).disabled = false;
+      for (const id of ['isolate', 'assembled', 'exploded', 'underside', 'shot']) byId(id).disabled = false;
       enableMechanisms();
       byId('gesture').hidden = false;
       viewer.select(state.selected, state.isolated);

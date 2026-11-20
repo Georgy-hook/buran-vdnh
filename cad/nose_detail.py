@@ -79,10 +79,11 @@ def covers(blank):
     def make(point, u, v, n, a, b, fullness, color, depth):
         # A flat lid sits below the curved, changing contour, with an annular
         # rebate one step deeper than the lid. Both are one blind subtraction.
-        rebate = .13 if color == ROOF_LID else .19
+        rebate = .16 if color == ROOF_LID else .24
+        lip = .22 if color == ROOF_LID else min(.29, a*.31, b*.31)
         c = point - n*depth
         outer = Part.Face(_oval(c-n*rebate, u*a, v*b, fullness))
-        inner = Part.Face(_oval(c-n*rebate, u*(a-.19), v*(b-.19), fullness))
+        inner = Part.Face(_oval(c-n*rebate, u*(a-lip), v*(b-lip), fullness))
         rim = outer.cut(inner).extrude(n*2.8)
         cap = Part.Face(_oval(c, u*a, v*b, fullness)).extrude(n*2.8)
         tools.append(cap.fuse(rim).removeSplitter())
@@ -130,7 +131,7 @@ def cover_color(materials, point):
         h = d.dot(n)
         if abs(h) < .013:
             # The museum lids are nearly flush against the surrounding mask.
-            return color if color == ROOF_LID else '#373c41'
+            return color
         if abs(h+rebate) < .015:
-            return '#a8aaa7' if color == ROOF_LID else '#282c30'
+            return '#aaa9a3' if color == ROOF_LID else '#676d70'
     return None

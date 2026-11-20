@@ -143,9 +143,10 @@
     // Span is the minimum width/height of the photograph at its subject plane.
     const views = new Map([
       ['cockpit', { at: [0.043, 0.027, 0.003], eye: [-0.86, 0.49, 1.07], span: [0.078, 0.054] }],
-      ['fin', { at: [0.202, 0.061, 0.001], eye: [0.47, 0.34, 1.16], span: [0.092, 0.084] }],
+      ['fin', { at: [0.224, 0.058, 0.001], eye: [0.55, 0.32, 1.16], span: [0.093, 0.087] }],
+      ['rear', { at: [0.235, 0.024, 0], eye: [1.55, 0.16, 0.67], span: [0.091, 0.070] }],
       ['gear', { at: [0.168, -0.009, 0.023], eye: [-0.89, 0.14, 1.05], span: [0.044, 0.036] }],
-      ['opened', { at: [0.117, 0.032, 0], eye: [-0.38, 1.36, 0.86], span: [0.127, 0.101] }],
+      ['opened', { at: [0.132, 0.027, 0], eye: [-0.30, 1.48, 0.82], span: [0.145, 0.107] }],
     ]);
     const foot = Array.from(parts.values()).reduce((a, b) =>
       a.bounds.min.y < b.bounds.min.y ? a : b,

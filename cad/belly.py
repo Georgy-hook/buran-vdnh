@@ -6,6 +6,7 @@ Two cutter families terminate inside each other's grooves at different depths.
 The surface between grooves is the original skin. Millimetres in the CAD frame.
 """
 import math
+from bisect import bisect_right
 
 import Part
 
@@ -35,10 +36,43 @@ def _perimeter():
 
 
 _CONTOUR, _ARC = _perimeter()
+_HALF = [(0., 0.)] + [_chin(i/96) for i in range(97)]
+_DIAGONAL = [y+z for y,z in _HALF]
+_STEP = _ARC[-1] / round(_ARC[-1]/COURSE)
+_RAILS = [(0., 0.)]
+for _i, ((ya,za), (yb,zb)) in enumerate(zip(_HALF, _HALF[1:])):
+    length = math.hypot(yb-ya,zb-za)
+    _RAILS.append((_RAILS[-1][0]+length, length))
+TILE_FINISHES = ('#35393c', '#393e40', '#373a3d', '#303537', '#414446', '#383d3e')
+
+
+def belly_color(x, y, z):
+    """A matte palette on the actual lands. The pale line sits in the cut,
+    not over the plate as a regular texture. Arc coordinates follow the chine.
+    """
+    w = abs(y)
+    j = min(len(_HALF)-2, max(0, bisect_right(_DIAGONAL, w+z)-1))
+    a, b = _HALF[j]
+    u, v = _HALF[j+1]
+    length = _RAILS[j+1][1]
+    dy, dz = (u-a)/length, (v-b)/length
+    along = (w-a)*dy+(z-b)*dz
+    depth = (z-b)*dy-(w-a)*dz
+    if depth > .31 or depth < -.05 or along > length+.33:
+        return '#32383d'
+    if depth > .115:
+        if w<9.4:
+            return '#5a605f'
+        if w<16.2:
+            return '#626766'
+        return '#656967'
+    circ = _ARC[-1]/2 + math.copysign(_RAILS[j][0]+along, y)
+    row = math.floor(circ/_STEP)
+    col = math.floor((x-(row%2)*PITCH*.5)/PITCH)
+    return TILE_FINISHES[(col*31+row*13+(col*row)%17) % len(TILE_FINISHES)]
 
 
 def _surface_point(u, depth):
-    from bisect import bisect_right
     i = min(len(_ARC)-2, max(0, bisect_right(_ARC, u)-1))
     a, b = _CONTOUR[i:i+2]
     length = _ARC[i+1] - _ARC[i]
